@@ -1,0 +1,26 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Large binaries & downloaded models
+assets/*.tflite
+assets/*.task
+
+# User outputs & recordings
+outputs/screenshots/*.png
+outputs/videos/*.mp4
+outputs/videos/*.avi
+assets/backgrounds/clean_background.png
+
+# IDE / OS settings
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
