@@ -58,7 +58,11 @@ def main():
     headless = args.duration > 0
 
     if not headless:
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        try:
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        except Exception as e:
+            print(f"[WARNING] GUI window display unavailable: {e}. Switching to headless mode.")
+            headless = True
 
     print("\n[CONTROLS GUIDE]")
     print("  'I' or 'i' : Toggle INVISIBLE Mode (Make Human Body 100% Invisible!)")
@@ -93,10 +97,6 @@ def main():
             if not ret or frame is None:
                 continue
 
-            # Ensure OpenCV window dimensions match frame
-            if not headless:
-                h_f, w_f = frame.shape[:2]
-
             # B. Update FPS
             current_fps = fps_counter.update()
 
@@ -130,8 +130,13 @@ def main():
 
             # H. Display Window
             if not headless:
-                cv2.imshow(window_name, output_frame)
-                key = cv2.waitKey(1) & 0xFF
+                try:
+                    cv2.imshow(window_name, output_frame)
+                    key = cv2.waitKey(1) & 0xFF
+                except Exception as e:
+                    print(f"[WARNING] cv2.imshow failed: {e}. Disabling GUI display.")
+                    headless = True
+                    key = 255
 
                 if key != 255:
                     char_key = chr(key).lower() if 0 <= key < 256 else ''
