@@ -1,2 +1,1 @@
-# OpenCV Headless does not require external libGL/glib apt packages
-libgl1
+libgl1-mesa-glx
