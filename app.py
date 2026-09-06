@@ -1,6 +1,6 @@
 """
 Ghost Invisibility CV - Ultra-Sleek Animated Sci-Fi Web Interface for Streamlit.
-Features: 1-Click Invisibility, Preset Backgrounds, Animated Glassmorphism UI, Live Effects.
+Features: Real-Time Live Background Inpainting, 1-Click Invisibility, Preset Backgrounds.
 """
 
 import sys
@@ -38,7 +38,7 @@ def load_cv_modules():
     mask_processor = MaskProcessor()
     blender = Blender(default_alpha=config.DEFAULT_ALPHA)
     ghost_engine = GhostEffectEngine(blender=blender)
-    bg_manager = BackgroundManager()
+    bg_manager = BackgroundManager(mode=config.BG_MODE_LIVE)
     return segmenter, mask_processor, blender, ghost_engine, bg_manager
 
 
@@ -165,7 +165,7 @@ def create_preset_background(preset_name: str, width: int = 640, height: int = 4
             sy = np.random.randint(0, height)
             brightness = np.random.randint(150, 255)
             bg[sy, sx] = (brightness, brightness, brightness)
-        cv2.putText(bg, "DEEP SPACE OBSERVTORY", (width // 2 - 150, height - 30),
+        cv2.putText(bg, "DEEP SPACE OBSERVATORY", (width // 2 - 150, height - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 220, 255), 2)
 
     return bg
@@ -182,7 +182,7 @@ def main():
             <span class="ghost-emoji">👻</span>
             <span class="glowing-title">GHOST INVISIBILITY VISION</span>
             <p style="color: #94a3b8; font-size: 1.1rem; margin-top: 5px;">
-                Instant AI Human Body Detection & Invisibility Cloak Engine
+                Real-Time Live Background Invisibility Cloak & AI Human Body Detection
             </p>
         </div>
     """, unsafe_allow_html=True)
@@ -198,23 +198,30 @@ def main():
     # Vision Effects Mode
     modes = {
         "👻 Invisibility Cloak": config.MODE_INVISIBLE,
+        "⚡ Active Camouflage (Refraction)": config.MODE_CAMOUFLAGE,
         "📷 Normal View": config.MODE_NORMAL,
         "✨ Spectral Ghost": config.MODE_GHOST,
         "⚡ Cyberpunk Neon": config.MODE_NEON_GHOST,
         "👾 Sci-Fi Glitch": config.MODE_GLITCH,
     }
-    selected_mode_label = st.sidebar.radio("Select Effect Mode", list(modes.keys()), index=0 if go_invisible else 1)
+    selected_mode_label = st.sidebar.radio("Select Effect Mode", list(modes.keys()), index=0 if go_invisible else 2)
     active_mode = config.MODE_INVISIBLE if go_invisible else modes[selected_mode_label]
 
     # Ghost Opacity Slider
     ghost_intensity = st.sidebar.slider("Transparency / Opacity Level", 0.0, 1.0, 0.0 if go_invisible else 0.7, 0.05)
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🖼️ Background Mode")
+    st.sidebar.markdown("### 🖼️ Background Method")
 
     bg_choice = st.sidebar.radio(
-        "Choose Background Source:",
-        ["📸 Custom Camera Background (Empty Room)", "🌌 Cyberpunk Room Preset", "🏢 Modern Office Preset", "✨ Deep Space Preset"],
+        "Choose Background Method:",
+        [
+            "⚡ Live Dynamic Inpainting (Zero setup! Inpaints live background)",
+            "📸 Static Captured Background (Empty room photo)",
+            "🌌 Cyberpunk Room Preset",
+            "🏢 Modern Office Preset",
+            "✨ Deep Space Preset",
+        ],
         index=0
     )
 
@@ -226,45 +233,52 @@ def main():
 
     with col_main:
         st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-        st.markdown("#### 📷 Live Camera Feed")
+        st.markdown("#### 📷 Live Camera")
 
-        # Handle Background Selection
-        clean_bg = None
-
+        # Static background photo step (only if Static Captured option is picked)
         if bg_choice.startswith("📸"):
-            st.info("💡 **Step 1:** Step out of camera view & take a photo of your **empty room** to set your natural background.")
-
+            st.info("💡 **Step 1:** Step out of camera view & take a photo of your **empty room** to set your static background.")
             bg_cam_input = st.camera_input("Capture Room Background", key="bg_input")
             if bg_cam_input is not None:
                 bytes_data = bg_cam_input.getvalue()
                 bg_arr = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
                 st.session_state["stored_bg"] = bg_arr
-                st.success("Background captured successfully!")
+                st.success("Static background captured successfully!")
 
             clean_bg = st.session_state.get("stored_bg", None)
+            st.markdown("---")
+            st.markdown("💡 **Step 2:** Step in front of camera to see yourself vanish!")
+
+        elif bg_choice.startswith("⚡"):
+            st.success("🟢 **Live Dynamic Invisibility Active!** No need to step out. The background behind you is reconstructed live!")
+            clean_bg = None
 
         else:
             preset_name = bg_choice.replace("🌌 ", "").replace("🏢 ", "").replace("✨ ", "")
             clean_bg = create_preset_background(preset_name)
             st.success(f"Using **{preset_name}** background preset!")
 
-        st.markdown("---")
-        st.markdown("💡 **Step 2:** Step in front of camera to see yourself vanish!")
-        live_cam_input = st.camera_input("Live Feed", key="live_input")
+        live_cam_input = st.camera_input("Take Live Photo / Video Stream", key="live_input")
 
         if live_cam_input is not None:
             bytes_data = live_cam_input.getvalue()
             live_frame = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
-
             h, w = live_frame.shape[:2]
-            if clean_bg is None:
-                clean_bg = np.zeros((h, w, 3), dtype=np.uint8)
+
+            # 1. Person Segmentation
+            raw_mask = segmenter.segment(live_frame, clean_bg)
+            refined_mask = mask_processor.process(raw_mask)
+
+            # 2. Background handling
+            if bg_choice.startswith("⚡"):
+                # Real-Time Dynamic Inpainting on live background
+                clean_bg = bg_manager.update_live_background(live_frame, refined_mask)
+            elif clean_bg is None:
+                clean_bg = bg_manager.update_live_background(live_frame, refined_mask)
             elif clean_bg.shape[:2] != (h, w):
                 clean_bg = cv2.resize(clean_bg, (w, h))
 
-            # Run CV Engine Pipeline
-            raw_mask = segmenter.segment(live_frame, clean_bg)
-            refined_mask = mask_processor.process(raw_mask)
+            # 3. Render Invisibility / Vision Effect
             rendered_frame = ghost_engine.render(live_frame, clean_bg, refined_mask)
 
             # Convert BGR to RGB for web rendering
@@ -282,16 +296,18 @@ def main():
         status_text = "INVISIBLE (100%)" if active_mode == config.MODE_INVISIBLE else active_mode
         st.markdown(f"**Status:** <span class='badge-active'>{status_text}</span>", unsafe_allow_html=True)
 
+        bg_mode_display = "Live Inpainted" if bg_choice.startswith("⚡") else ("Preset" if "Preset" in bg_choice else "Static")
+        st.markdown(f"**Background:** `{bg_mode_display}`")
         st.markdown(f"**AI Engine:** MediaPipe Neural Segmenter")
-        st.markdown(f"**Delta Fusion:** Active")
-        st.markdown(f"**Opacity Level:** {int((1.0 - ghost_intensity) * 100)}% Invisible")
+        st.markdown(f"**Dynamic Inpainting:** `Active`")
+        st.markdown(f"**Invisibility Level:** `{int((1.0 - ghost_intensity) * 100)}%`")
 
         st.markdown("---")
-        st.markdown("#### ⚡ Quick Instructions")
+        st.markdown("#### ⚡ Live Invisibility Tips")
         st.markdown("""
-        1. Select **Background Source** (Empty Room photo OR Preset Background).
-        2. Check **BECOME 100% INVISIBLE** in the sidebar.
-        3. Take a photo under **Live Feed** to see your body vanish completely into the background!
+        - **Live Dynamic Inpainting** uses the real-time surrounding room pixels to erase you with zero setup!
+        - If you move the camera or change rooms, the background updates **live**!
+        - Try **Active Camouflage** for a sci-fi predator-style glass cloak effect!
         """)
         st.markdown('</div>', unsafe_allow_html=True)
 

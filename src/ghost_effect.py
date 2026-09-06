@@ -30,6 +30,7 @@ class GhostEffectEngine:
             config.MODE_NORMAL,
             config.MODE_GHOST,
             config.MODE_INVISIBLE,
+            config.MODE_CAMOUFLAGE,
             config.MODE_NEON_GHOST,
             config.MODE_GLITCH,
         ]:
@@ -57,6 +58,9 @@ class GhostEffectEngine:
 
         if self.mode == config.MODE_INVISIBLE:
             return self.blender.blend_invisible(foreground, background, mask)
+
+        if self.mode == config.MODE_CAMOUFLAGE:
+            return self.blender.blend_camouflage(foreground, background, mask)
 
         if self.mode == config.MODE_GHOST:
             base_ghost = self.blender.blend_ghost(foreground, background, mask, alpha=self.intensity)

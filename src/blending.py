@@ -100,3 +100,33 @@ class Blender:
         output_float = mask_3d * bg_float + (1.0 - mask_3d) * fg_float
 
         return np.clip(output_float, 0, 255).astype(np.uint8)
+
+    def blend_camouflage(
+        self,
+        foreground: np.ndarray,
+        background: np.ndarray,
+        mask: np.ndarray,
+        distortion: float = 12.0,
+    ) -> np.ndarray:
+        """
+        Active optical camouflage: refracts the live background across
+        the human body boundary for a predator-style transparent cloak.
+        """
+        if background is None:
+            background = foreground.copy()
+        background = self._ensure_matching_shape(background, foreground)
+        h, w = foreground.shape[:2]
+
+        # Calculate gradients of the mask to create refraction map
+        grad_x = cv2.Sobel(mask, cv2.CV_32F, 1, 0, ksize=5)
+        grad_y = cv2.Sobel(mask, cv2.CV_32F, 0, 1, ksize=5)
+
+        # Coordinate grid
+        grid_x, grid_y = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
+
+        # Displace grid by mask boundary gradients
+        map_x = np.clip(grid_x + grad_x * distortion, 0, w - 1).astype(np.float32)
+        map_y = np.clip(grid_y + grad_y * distortion, 0, h - 1).astype(np.float32)
+
+        refracted_bg = cv2.remap(background, map_x, map_y, cv2.INTER_LINEAR)
+        return self.blend_invisible(foreground, refracted_bg, mask)

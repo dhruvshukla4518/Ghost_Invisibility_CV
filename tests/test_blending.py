@@ -1,5 +1,5 @@
 """
-Unit tests for alpha blending engine.
+Unit tests for alpha blending and camouflage engine.
 """
 
 import pytest
@@ -47,3 +47,16 @@ def test_blend_invisible():
     assert np.allclose(result[25, 25], [50, 50, 50], atol=2)
     # Outside should be foreground (200)
     assert np.allclose(result[5, 5], [200, 200, 200], atol=2)
+
+
+def test_blend_camouflage():
+    blender = Blender()
+    fg = np.ones((50, 50, 3), dtype=np.uint8) * 200
+    bg = np.ones((50, 50, 3), dtype=np.uint8) * 50
+    mask = np.zeros((50, 50), dtype=np.float32)
+    mask[10:40, 10:40] = 1.0
+
+    result = blender.blend_camouflage(fg, bg, mask, distortion=5.0)
+
+    assert result is not None
+    assert result.shape == (50, 50, 3)

@@ -1,5 +1,5 @@
 """
-Heads-up display (HUD) overlay renderer.
+Heads-up display (HUD) overlay renderer with Live Background telemetry.
 """
 
 import cv2
@@ -16,7 +16,7 @@ class HUD:
         self.font = cv2.FONT_HERSHEY_SIMPLEX
         self.font_scale_title = 0.65
         self.font_scale_info = 0.5
-        self.font_scale_legend = 0.45
+        self.font_scale_legend = 0.42
 
     def draw(
         self,
@@ -27,6 +27,7 @@ class HUD:
         gesture_status: str,
         has_background: bool,
         alpha: float,
+        bg_mode: str = "LIVE",
         is_recording: bool = False,
     ) -> np.ndarray:
         """
@@ -56,6 +57,9 @@ class HUD:
         if mode == "INVISIBLE":
             mode_color = (0, 255, 0)
             mode_text = "Mode: INVISIBLE (100%)"
+        elif mode == "CAMOUFLAGE":
+            mode_color = (0, 242, 254)
+            mode_text = "Mode: CAMOUFLAGE (Refract)"
         elif mode == "GHOST":
             mode_color = (0, 200, 255)
             mode_text = "Mode: GHOST"
@@ -63,29 +67,33 @@ class HUD:
             mode_color = (200, 200, 200)
             mode_text = "Mode: NORMAL"
 
-        cv2.putText(output, mode_text, (160, 25), self.font, self.font_scale_info, mode_color, 2 if mode == "INVISIBLE" else 1, cv2.LINE_AA)
+        cv2.putText(output, mode_text, (160, 25), self.font, self.font_scale_info, mode_color, 2 if mode in ["INVISIBLE", "CAMOUFLAGE"] else 1, cv2.LINE_AA)
 
         fps_text = f"FPS: {fps:.1f}"
-        cv2.putText(output, fps_text, (370, 25), self.font, self.font_scale_info, (255, 255, 255), 1, cv2.LINE_AA)
+        cv2.putText(output, fps_text, (380, 25), self.font, self.font_scale_info, (255, 255, 255), 1, cv2.LINE_AA)
 
         seg_str = "ON (AI)" if segmentation_on else "OFF"
-        cv2.putText(output, f"Person Detection: {seg_str}", (470, 25), self.font, self.font_scale_info, (255, 200, 0), 1, cv2.LINE_AA)
+        cv2.putText(output, f"Person Detection: {seg_str}", (480, 25), self.font, self.font_scale_info, (255, 200, 0), 1, cv2.LINE_AA)
 
         # Top Banner Text Row 2: Secondary Telemetry & Guidance
-        if not has_background:
-            bg_str = "NOT SET (Step out of view & Press B)"
-            bg_color = (0, 0, 255)
+        if bg_mode == "LIVE":
+            bg_str = "LIVE DYNAMIC (Auto-Inpaint)"
+            bg_color = (0, 255, 200)
         else:
-            bg_str = "READY (Press B to recaptured)"
-            bg_color = (0, 255, 0)
+            if not has_background:
+                bg_str = "STATIC: NOT SET (Press B)"
+                bg_color = (0, 0, 255)
+            else:
+                bg_str = "STATIC: READY (Press B to update)"
+                bg_color = (0, 255, 0)
 
-        cv2.putText(output, f"Background: {bg_str}", (15, 55), self.font, self.font_scale_info, bg_color, 1, cv2.LINE_AA)
+        cv2.putText(output, f"BG: {bg_str}", (15, 55), self.font, self.font_scale_info, bg_color, 1, cv2.LINE_AA)
 
         if mode == "INVISIBLE":
-            action_hint = "[I] Active - Press 'I' for Normal"
+            action_hint = "[I] Active (Press 'I' for Normal)"
             hint_color = (0, 255, 100)
         else:
-            action_hint = "Press 'I' to become INVISIBLE"
+            action_hint = "[I] Press 'I' to become INVISIBLE"
             hint_color = (0, 200, 255)
 
         cv2.putText(output, action_hint, (w - 320, 55), self.font, self.font_scale_info, hint_color, 1, cv2.LINE_AA)
@@ -95,7 +103,7 @@ class HUD:
             cv2.putText(output, "REC", (w - 55, 26), self.font, 0.45, (0, 0, 255), 1, cv2.LINE_AA)
 
         # Bottom Bar: Keyboard Shortcuts Legend
-        legend = "[I] Toggle Invisibility  [B] Capture Background  [N] Normal  [G] Ghost  [Q] Quit"
+        legend = "[I] Invisibility  [L] Live/Static BG  [B] Capture Snapshot  [C] Camouflage  [N] Normal  [Q] Quit"
         cv2.putText(output, legend, (10, h - 10), self.font, self.font_scale_legend, (220, 220, 220), 1, cv2.LINE_AA)
 
         return output
