@@ -1,6 +1,6 @@
 """
-Dynamic Background Manager with Real-Time Live Background Inpainting and Camera Tracking.
-Provides both live dynamic background reconstruction and static snapshot modes.
+Dynamic Background Manager with Live Inpainting and Pure Background Preservation.
+Keeps 100% of the live background intact while erasing the detected human being in real time.
 """
 
 from pathlib import Path
@@ -12,8 +12,8 @@ import config
 class BackgroundManager:
     """
     Manages background frames. Supports:
-    1. LIVE Mode: Real-time dynamic background reconstruction, live inpainting,
-       ambient exposure adaptation, and camera motion compensation.
+    1. LIVE Mode: Real-time dynamic background reconstruction. Keeps 100% of the
+       live background feed intact as-is, and in-paints the detected human region.
     2. STATIC Mode: Traditional frozen background snapshot (via 'B' key).
     """
 
@@ -27,10 +27,9 @@ class BackgroundManager:
         self.static_background = None
         self.is_captured = False
 
-        # Live Dynamic Background Buffers
-        self.live_background = None
-        self.bg_confidence = None
-        self.prev_gray = None
+        # Live Dynamic Memory Buffer
+        self.temporal_bg = None
+        self.bg_seen_mask = None
         self.inpaint_scale = config.INPAINT_SCALE
         self.inpaint_radius = config.INPAINT_RADIUS
 
@@ -89,74 +88,60 @@ class BackgroundManager:
         person_mask: np.ndarray = None,
     ) -> np.ndarray:
         """
-        Updates the live background model using the incoming camera frame and person mask.
-        - Updates unmasked background pixels with the current live scene.
-        - Fills the person silhouette using real-time multi-scale inpainting & memory.
-        - Adapts to camera motion and ambient lighting changes.
+        Generates live background:
+        - Outside the person mask: EXACT live camera frame is preserved 100% as it is.
+        - Inside the person mask: Live multi-scale inpainting from surrounding live pixels,
+          fused with temporal memory of previously uncovered scene pixels.
         """
         if current_frame is None or current_frame.size == 0:
-            return self.live_background
+            return current_frame
 
         h, w = current_frame.shape[:2]
 
-        # Initialize buffers if not created or dimensions changed
-        if self.live_background is None or self.live_background.shape[:2] != (h, w):
-            self.live_background = current_frame.copy()
-            self.bg_confidence = np.zeros((h, w), dtype=np.float32)
+        # Initialize temporal memory buffers if needed
+        if self.temporal_bg is None or self.temporal_bg.shape[:2] != (h, w):
+            self.temporal_bg = current_frame.copy()
+            self.bg_seen_mask = np.zeros((h, w), dtype=np.uint8)
 
         if person_mask is None:
-            # Entire frame is background
-            self.live_background = current_frame.copy()
-            self.bg_confidence.fill(1.0)
-            return self.live_background
+            self.temporal_bg = current_frame.copy()
+            self.bg_seen_mask.fill(255)
+            return current_frame.copy()
 
-        # Resize mask if shape differs
+        # Ensure mask matches frame dimensions
         if person_mask.shape[:2] != (h, w):
             person_mask = cv2.resize(person_mask, (w, h))
 
-        # Binary unmasked area (where person is NOT present)
-        unmasked = person_mask < 0.2
+        # 1. Update temporal memory for all pixels outside the person
+        unmasked = person_mask < 0.15
+        self.temporal_bg[unmasked] = current_frame[unmasked]
+        self.bg_seen_mask[unmasked] = 255
+
+        # 2. Start from the exact current live frame (keeps live bg 100% as it is)
+        live_bg = current_frame.copy()
+
+        # 3. For pixels occluded by the person:
+        # Perform fast real-time inpainting using the surrounding live frame pixels
+        inpainted = self._fast_inpaint(current_frame, person_mask)
+
+        # 4. Check if any occluded pixels were previously seen in temporal memory
         masked = ~unmasked
+        previously_seen = masked & (self.bg_seen_mask == 255)
 
-        # 1. Camera Motion Compensation (Optional feature tracking on background)
-        curr_gray = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
-        if config.ENABLE_CAMERA_STABILIZATION and self.prev_gray is not None and self.prev_gray.shape == (h, w):
-            self._compensate_camera_motion(curr_gray, unmasked)
-        self.prev_gray = curr_gray
+        # Blend: use temporal memory where previously revealed, live inpainting elsewhere
+        inpaint_fill = inpainted.copy()
+        if np.any(previously_seen):
+            inpaint_fill[previously_seen] = self.temporal_bg[previously_seen]
 
-        # 2. Update all visible background pixels directly from current live frame
-        # Smoothly update unmasked background to absorb lighting changes
-        self.live_background[unmasked] = current_frame[unmasked]
-        self.bg_confidence[unmasked] = 1.0
+        # Insert reconstructed background only inside the person mask
+        live_bg[masked] = inpaint_fill[masked]
 
-        # Slowly decay confidence of occluded regions
-        self.bg_confidence[masked] = np.maximum(0.0, self.bg_confidence[masked] - 0.02)
-
-        # 3. For occluded regions with low confidence or when camera changed:
-        # Generate real-time live inpainting from surrounding live background
-        needs_inpaint = masked & (self.bg_confidence < 0.3)
-        if np.any(needs_inpaint):
-            inpainted = self._fast_inpaint(current_frame, person_mask)
-            # Blend inpainted pixels into low-confidence regions
-            self.live_background[needs_inpaint] = inpainted[needs_inpaint]
-
-        # 4. Live Exposure & Color Adaptation
-        # If lighting in the room changed, adjust brightness of the occluded background
-        if np.any(unmasked):
-            live_mean = np.mean(current_frame[unmasked], axis=0)
-            bg_mean = np.mean(self.live_background[unmasked], axis=0)
-            diff = live_mean - bg_mean
-            if np.linalg.norm(diff) > 2.0:
-                # Apply color/brightness shift to occluded background pixels
-                adjusted_bg = np.clip(self.live_background.astype(np.float32) + diff, 0, 255).astype(np.uint8)
-                self.live_background[masked] = adjusted_bg[masked]
-
-        return self.live_background
+        return live_bg
 
     def _fast_inpaint(self, frame: np.ndarray, mask: np.ndarray) -> np.ndarray:
         """
         Performs fast multi-scale inpainting on the live frame using Telea algorithm.
-        Downscales the image and mask for real-time 30+ FPS speed, then upscales.
+        Downscales for real-time 30+ FPS speed, then upscales smoothly.
         """
         h, w = frame.shape[:2]
         scale = self.inpaint_scale
@@ -165,7 +150,7 @@ class BackgroundManager:
         small_h = max(1, int(h * scale))
 
         small_frame = cv2.resize(frame, (small_w, small_h), interpolation=cv2.INTER_LINEAR)
-        small_mask = cv2.resize((mask > 0.3).astype(np.uint8) * 255, (small_w, small_h), interpolation=cv2.INTER_NEAREST)
+        small_mask = cv2.resize((mask > 0.2).astype(np.uint8) * 255, (small_w, small_h), interpolation=cv2.INTER_NEAREST)
 
         # Inpaint scaled image using Telea algorithm
         small_inpainted = cv2.inpaint(
@@ -179,42 +164,6 @@ class BackgroundManager:
         inpainted_full = cv2.resize(small_inpainted, (w, h), interpolation=cv2.INTER_LINEAR)
         return inpainted_full
 
-    def _compensate_camera_motion(self, curr_gray: np.ndarray, unmasked: np.ndarray):
-        """
-        Estimates camera translation across frames using optical flow on background points.
-        """
-        try:
-            # Find feature points in unmasked background of previous frame
-            mask_uint8 = unmasked.astype(np.uint8) * 255
-            prev_pts = cv2.goodFeaturesToTrack(
-                self.prev_gray,
-                maxCorners=60,
-                qualityLevel=0.03,
-                minDistance=15,
-                mask=mask_uint8,
-            )
-
-            if prev_pts is not None and len(prev_pts) >= 10:
-                curr_pts, status, _ = cv2.calcOpticalFlowPyrLK(
-                    self.prev_gray, curr_gray, prev_pts, None
-                )
-                valid_prev = prev_pts[status == 1]
-                valid_curr = curr_pts[status == 1]
-
-                if len(valid_prev) >= 8:
-                    M, _ = cv2.estimateAffinePartial2D(valid_prev, valid_curr)
-                    if M is not None:
-                        # Warp the background buffer and confidence map by the camera shift
-                        h, w = curr_gray.shape[:2]
-                        self.live_background = cv2.warpAffine(
-                            self.live_background, M, (w, h), borderMode=cv2.BORDER_REFLECT_101
-                        )
-                        self.bg_confidence = cv2.warpAffine(
-                            self.bg_confidence, M, (w, h), borderMode=cv2.BORDER_CONSTANT, borderValue=0.0
-                        )
-        except Exception:
-            pass
-
     def get_background(
         self,
         target_shape: tuple = None,
@@ -223,31 +172,30 @@ class BackgroundManager:
     ) -> np.ndarray:
         """
         Returns the background image:
-        - In LIVE mode: dynamically reconstructs and returns the live background.
+        - In LIVE mode: dynamically reconstructs and returns live background with 100% live BG preservation.
         - In STATIC mode: returns the captured static snapshot (or falls back to live).
         """
         # A. LIVE Mode
         if self.mode == config.BG_MODE_LIVE:
             if current_frame is not None:
                 bg = self.update_live_background(current_frame, person_mask)
-            elif self.live_background is not None:
-                bg = self.live_background.copy()
+            elif self.temporal_bg is not None:
+                bg = self.temporal_bg.copy()
             elif self.static_background is not None:
                 bg = self.static_background.copy()
             else:
-                return None
+                return current_frame
 
         # B. STATIC Mode
         else:
             if self.is_captured and self.static_background is not None:
                 bg = self.static_background.copy()
             elif current_frame is not None:
-                # Fallback to live background if no static snapshot captured yet
                 bg = self.update_live_background(current_frame, person_mask)
-            elif self.live_background is not None:
-                bg = self.live_background.copy()
+            elif self.temporal_bg is not None:
+                bg = self.temporal_bg.copy()
             else:
-                return None
+                return current_frame
 
         # Resize if target shape (width, height) is specified
         if bg is not None and target_shape is not None:

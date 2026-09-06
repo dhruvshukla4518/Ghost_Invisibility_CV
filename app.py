@@ -265,8 +265,8 @@ def main():
             live_frame = cv2.imdecode(np.frombuffer(bytes_data, np.uint8), cv2.IMREAD_COLOR)
             h, w = live_frame.shape[:2]
 
-            # 1. Person Segmentation
-            raw_mask = segmenter.segment(live_frame, clean_bg)
+            # 1. Pure AI Person Segmentation
+            raw_mask = segmenter.segment(live_frame)
             refined_mask = mask_processor.process(raw_mask)
 
             # 2. Background handling

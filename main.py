@@ -103,8 +103,8 @@ def main():
             # C. Hand Gesture Tracking & Parameter Control
             gesture = hand_tracker.process_frame(frame)
 
-            # D. Person Segmentation (Advanced AI Body Detection)
-            raw_mask = segmenter.segment(frame, clean_bg)
+            # D. Person Segmentation (Advanced Pure AI Body Detection)
+            raw_mask = segmenter.segment(frame)
 
             # E. Mask Refinement & Boundary Dilation Expansion
             refined_mask = mask_processor.process(raw_mask)
