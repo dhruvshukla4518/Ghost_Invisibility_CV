@@ -4,6 +4,8 @@ Featuring Clean Room Background Capture & Real-Time Invisibility.
 """
 
 import sys
+import time
+import math
 import argparse
 import cv2
 import numpy as np
@@ -67,7 +69,7 @@ def main():
 
     print("\n[CONTROLS GUIDE]")
     print("  'I' or 'i' : Toggle INVISIBLE Mode (Make Human Body 100% Invisible!)")
-    print("  'B' or 'b' : Capture Clean Room Background (Step out of view for 1s)")
+    print("  'B' or 'b' : 3-Second Room Capture (Gives you 3s to step aside and capture your room!)")
     print("  'P' or 'p' : Cycle Background Presets (Room / Studio / Cyberpunk)")
     print("  'C' or 'c' : Toggle Active Camouflage (Refract live background)")
     print("  'N' or 'n' : Return to NORMAL camera feed")
@@ -77,6 +79,11 @@ def main():
 
     # Start in DEFAULT_MODE (MODE_NORMAL)
     ghost_engine.set_mode(config.MODE_NORMAL)
+
+    # Countdown state variables
+    countdown_active = False
+    countdown_start = 0.0
+    show_success_until = 0.0
 
     start_timestamp = cv2.getTickCount()
 
@@ -110,8 +117,18 @@ def main():
             human_coverage = np.mean(refined_mask > 0.3)
             is_human_detected = human_coverage > 0.02
 
-            # G. Auto-Capture Clean Room Background when no human is in frame
-            if not is_human_detected and not bg_manager.is_preset_active:
+            # G. Handle 3-Second Room Capture Countdown
+            remaining_countdown = 0
+            if countdown_active:
+                elapsed_cd = time.time() - countdown_start
+                remaining_countdown = max(1, int(math.ceil(3.0 - elapsed_cd)))
+                if elapsed_cd >= 3.0:
+                    bg_manager.capture_background(frame)
+                    countdown_active = False
+                    show_success_until = time.time() + 2.5
+                    print("[INFO] Clean room captured successfully!")
+            elif not is_human_detected and not bg_manager.has_background() and not bg_manager.is_preset_active:
+                # Auto-capture when no human has entered yet
                 bg_manager.auto_capture_if_clear(frame, refined_mask)
 
             # H. Retrieve Clean Background Frame
@@ -134,6 +151,8 @@ def main():
                 has_background=bg_manager.has_background(),
                 is_human_detected=is_human_detected,
                 is_preset=bg_manager.is_preset_active,
+                countdown_sec=remaining_countdown if countdown_active else 0,
+                show_success=(time.time() < show_success_until),
                 is_recording=recorder.is_recording,
             )
 
@@ -163,8 +182,9 @@ def main():
                             ghost_engine.set_mode(config.MODE_INVISIBLE)
                             print("[INFO] INVISIBILITY ACTIVATED!")
                     elif char_key == 'b':
-                        bg_manager.capture_background(frame)
-                        print("[INFO] Captured background frame manually via 'B' key.")
+                        countdown_active = True
+                        countdown_start = time.time()
+                        print("[INFO] 3-second countdown initiated! Step out of view to capture your room...")
                     elif char_key == 'p':
                         preset_name = bg_manager.cycle_preset((frame.shape[1], frame.shape[0]))
                         print(f"[INFO] Active preset changed to: {preset_name}")

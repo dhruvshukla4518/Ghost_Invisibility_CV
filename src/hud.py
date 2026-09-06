@@ -1,5 +1,5 @@
 """
-Heads-up display (HUD) overlay renderer with real room background telemetry.
+Heads-up display (HUD) overlay renderer with real room background telemetry and countdown.
 """
 
 import cv2
@@ -9,7 +9,7 @@ import numpy as np
 class HUD:
     """
     Renders real-time telemetry, mode status, FPS, gesture status,
-    and keyboard control legends onto output video frames.
+    countdown timer, and keyboard control legends onto output video frames.
     """
 
     def __init__(self):
@@ -28,6 +28,8 @@ class HUD:
         has_background: bool,
         is_human_detected: bool,
         is_preset: bool = False,
+        countdown_sec: int = 0,
+        show_success: bool = False,
         is_recording: bool = False,
     ) -> np.ndarray:
         """
@@ -78,13 +80,13 @@ class HUD:
 
         # Top Banner Text Row 2: Secondary Telemetry & Guidance
         if is_preset:
-            bg_str = "PRESET ROOM (Press 'P' to cycle)"
+            bg_str = "PRESET ROOM (Press 'B' for YOUR room)"
             bg_color = (0, 242, 254)
         elif has_background:
-            bg_str = "ROOM READY (Captured before human)"
+            bg_str = "YOUR REAL ROOM (Captured & Ready)"
             bg_color = (0, 255, 0)
         else:
-            bg_str = "STEP ASIDE 1s to capture room (or press 'P' for presets)"
+            bg_str = "Press 'B' to capture your empty room"
             bg_color = (0, 165, 255)
 
         cv2.putText(output, f"BG: {bg_str}", (15, 55), self.font, self.font_scale_info, bg_color, 1, cv2.LINE_AA)
@@ -102,8 +104,35 @@ class HUD:
             cv2.circle(output, (w - 20, 22), 7, (0, 0, 255), -1)
             cv2.putText(output, "REC", (w - 55, 26), self.font, 0.45, (0, 0, 255), 1, cv2.LINE_AA)
 
+        # Center Screen Countdown Overlay
+        if countdown_sec > 0:
+            box_w, box_h = 440, 130
+            bx = (w - box_w) // 2
+            by = (h - box_h) // 2
+            # Dark backing box
+            sub_overlay = output.copy()
+            cv2.rectangle(sub_overlay, (bx, by), (bx + box_w, by + box_h), (10, 10, 20), -1)
+            cv2.rectangle(sub_overlay, (bx, by), (bx + box_w, by + box_h), (0, 255, 255), 3)
+            cv2.addWeighted(sub_overlay, 0.85, output, 0.15, 0, output)
+
+            cv2.putText(output, "STEP OUT OF CAMERA VIEW!", (bx + 25, by + 45), self.font, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+            count_str = f"Capturing clean room in: {countdown_sec}s"
+            cv2.putText(output, count_str, (bx + 40, by + 95), self.font, 0.75, (0, 255, 0), 2, cv2.LINE_AA)
+
+        elif show_success:
+            box_w, box_h = 460, 100
+            bx = (w - box_w) // 2
+            by = (h - box_h) // 2
+            sub_overlay = output.copy()
+            cv2.rectangle(sub_overlay, (bx, by), (bx + box_w, by + box_h), (10, 30, 10), -1)
+            cv2.rectangle(sub_overlay, (bx, by), (bx + box_w, by + box_h), (0, 255, 0), 3)
+            cv2.addWeighted(sub_overlay, 0.85, output, 0.15, 0, output)
+
+            cv2.putText(output, "REAL ROOM CAPTURED!", (bx + 60, by + 40), self.font, 0.75, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(output, "Step back in & press 'I' to be invisible!", (bx + 30, by + 75), self.font, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
+
         # Bottom Bar: Keyboard Shortcuts Legend
-        legend = "[I] Invisibility  [B] Capture Room  [P] Preset BG  [C] Camouflage  [N] Normal  [Q] Quit"
+        legend = "[I] Invisibility  [B] 3s Room Capture  [P] Preset BG  [C] Camouflage  [N] Normal  [Q] Quit"
         cv2.putText(output, legend, (10, h - 10), self.font, self.font_scale_legend, (220, 220, 220), 1, cv2.LINE_AA)
 
         return output
