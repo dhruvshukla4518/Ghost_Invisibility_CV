@@ -1,6 +1,6 @@
 """
 Real-Time Ghost Invisibility System - Main Application Entry Point.
-Featuring Live Dynamic Background Inpainting & Real-Time Invisibility.
+Featuring Clean Room Background Capture & Real-Time Invisibility.
 """
 
 import sys
@@ -26,7 +26,6 @@ def parse_args():
     parser.add_argument("--camera", type=int, default=config.CAMERA_INDEX, help="Camera device index (0 for default, 1 or 2 for external/mobile camera)")
     parser.add_argument("--synthetic", action="store_true", help="Force synthetic camera mode for testing/demo without webcam")
     parser.add_argument("--duration", type=float, default=0, help="Run headless for specified duration in seconds (for CI/automated verification)")
-    parser.add_argument("--static-bg", action="store_true", help="Use static background capture instead of live dynamic background")
     return parser.parse_args()
 
 
@@ -47,8 +46,7 @@ def main():
 
     # 2. Initialize CV Pipeline Modules
     segmenter = PersonSegmenter(threshold=config.SEGMENTATION_THRESHOLD)
-    bg_mode = config.BG_MODE_STATIC if args.static_bg else config.BG_MODE_LIVE
-    bg_manager = BackgroundManager(mode=bg_mode)
+    bg_manager = BackgroundManager()
     mask_processor = MaskProcessor()
     blender = Blender(default_alpha=config.DEFAULT_ALPHA)
     ghost_engine = GhostEffectEngine(blender=blender)
@@ -68,10 +66,10 @@ def main():
             headless = True
 
     print("\n[CONTROLS GUIDE]")
-    print("  'I' or 'i' : Toggle INVISIBLE Mode (Make Human Body 100% Invisible in LIVE BG!)")
-    print("  'L' or 'l' : Toggle Background Mode (LIVE Dynamic Inpaint <-> STATIC Snapshot)")
-    print("  'C' or 'c' : Toggle Active Camouflage (Refract live background through body)")
-    print("  'B' or 'b' : Manually Capture/Freeze Clean Background Snapshot")
+    print("  'I' or 'i' : Toggle INVISIBLE Mode (Make Human Body 100% Invisible!)")
+    print("  'B' or 'b' : Capture Clean Room Background (Step out of view for 1s)")
+    print("  'P' or 'p' : Cycle Background Presets (Room / Studio / Cyberpunk)")
+    print("  'C' or 'c' : Toggle Active Camouflage (Refract live background)")
     print("  'N' or 'n' : Return to NORMAL camera feed")
     print("  'G' or 'g' : Toggle Spectral GHOST Mode")
     print("  'S' or 's' : Take Timestamped Screenshot")
@@ -80,7 +78,6 @@ def main():
     # Start in DEFAULT_MODE (MODE_NORMAL)
     ghost_engine.set_mode(config.MODE_NORMAL)
 
-    clean_bg = None
     start_timestamp = cv2.getTickCount()
 
     try:
@@ -100,26 +97,34 @@ def main():
             # B. Update FPS
             current_fps = fps_counter.update()
 
-            # C. Hand Gesture Tracking & Parameter Control
+            # C. Hand Gesture Tracking
             gesture = hand_tracker.process_frame(frame)
 
-            # D. Person Segmentation (Advanced Pure AI Body Detection)
+            # D. Pure AI Person Segmentation
             raw_mask = segmenter.segment(frame)
 
-            # E. Mask Refinement & Boundary Dilation Expansion
+            # E. Mask Refinement & Contour Cleaning
             refined_mask = mask_processor.process(raw_mask)
 
-            # F. Live Dynamic Background Update & Retrieval
+            # F. Check Human Presence
+            human_coverage = np.mean(refined_mask > 0.3)
+            is_human_detected = human_coverage > 0.02
+
+            # G. Auto-Capture Clean Room Background when no human is in frame
+            if not is_human_detected and not bg_manager.is_preset_active:
+                bg_manager.auto_capture_if_clear(frame, refined_mask)
+
+            # H. Retrieve Clean Background Frame
             clean_bg = bg_manager.get_background(
                 target_shape=(frame.shape[1], frame.shape[0]),
-                current_frame=frame,
+                live_frame=frame,
                 person_mask=refined_mask,
             )
 
-            # G. Render Invisibility / Ghost Effect
+            # I. Render Invisibility / Vision Effect
             rendered_frame = ghost_engine.render(frame, clean_bg, refined_mask)
 
-            # H. HUD Overlay
+            # J. HUD Overlay
             output_frame = hud.draw(
                 frame=rendered_frame,
                 mode=ghost_engine.mode,
@@ -127,15 +132,15 @@ def main():
                 segmentation_on=segmenter.use_mediapipe or True,
                 gesture_status=gesture,
                 has_background=bg_manager.has_background(),
-                alpha=ghost_engine.intensity,
-                bg_mode=bg_manager.mode,
+                is_human_detected=is_human_detected,
+                is_preset=bg_manager.is_preset_active,
                 is_recording=recorder.is_recording,
             )
 
             # Write frame if video recording is active
             recorder.write(output_frame)
 
-            # I. Display Window
+            # K. Display Window
             if not headless:
                 try:
                     cv2.imshow(window_name, output_frame)
@@ -156,20 +161,19 @@ def main():
                             print("[INFO] Invisibility deactivated -> Mode: NORMAL")
                         else:
                             ghost_engine.set_mode(config.MODE_INVISIBLE)
-                            print(f"[INFO] INVISIBILITY ACTIVATED! (Background Mode: {bg_manager.mode})")
-                    elif char_key == 'l':
-                        new_mode = bg_manager.toggle_mode()
-                        print(f"[INFO] Switched Background Mode to: {new_mode}")
+                            print("[INFO] INVISIBILITY ACTIVATED!")
+                    elif char_key == 'b':
+                        bg_manager.capture_background(frame)
+                        print("[INFO] Captured background frame manually via 'B' key.")
+                    elif char_key == 'p':
+                        preset_name = bg_manager.cycle_preset((frame.shape[1], frame.shape[0]))
+                        print(f"[INFO] Active preset changed to: {preset_name}")
                     elif char_key == 'c':
                         if ghost_engine.mode == config.MODE_CAMOUFLAGE:
                             ghost_engine.set_mode(config.MODE_NORMAL)
                         else:
                             ghost_engine.set_mode(config.MODE_CAMOUFLAGE)
                             print("[INFO] Active Camouflage Cloak ACTIVATED!")
-                    elif char_key == 'b':
-                        bg_manager.capture_background(frame)
-                        bg_manager.set_mode(config.BG_MODE_STATIC)
-                        print("[INFO] Captured static snapshot & switched to STATIC mode.")
                     elif char_key == 'g':
                         ghost_engine.set_mode(config.MODE_GHOST)
                     elif char_key == 'n':

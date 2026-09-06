@@ -1,5 +1,5 @@
 """
-Heads-up display (HUD) overlay renderer with Live Background telemetry.
+Heads-up display (HUD) overlay renderer with real room background telemetry.
 """
 
 import cv2
@@ -26,8 +26,8 @@ class HUD:
         segmentation_on: bool,
         gesture_status: str,
         has_background: bool,
-        alpha: float,
-        bg_mode: str = "LIVE",
+        is_human_detected: bool,
+        is_preset: bool = False,
         is_recording: bool = False,
     ) -> np.ndarray:
         """
@@ -72,20 +72,20 @@ class HUD:
         fps_text = f"FPS: {fps:.1f}"
         cv2.putText(output, fps_text, (380, 25), self.font, self.font_scale_info, (255, 255, 255), 1, cv2.LINE_AA)
 
-        seg_str = "ON (AI)" if segmentation_on else "OFF"
-        cv2.putText(output, f"Person Detection: {seg_str}", (480, 25), self.font, self.font_scale_info, (255, 200, 0), 1, cv2.LINE_AA)
+        det_color = (0, 255, 0) if is_human_detected else (150, 150, 150)
+        det_str = "HUMAN DETECTED" if is_human_detected else "NO HUMAN"
+        cv2.putText(output, det_str, (480, 25), self.font, self.font_scale_info, det_color, 2 if is_human_detected else 1, cv2.LINE_AA)
 
         # Top Banner Text Row 2: Secondary Telemetry & Guidance
-        if bg_mode == "LIVE":
-            bg_str = "LIVE DYNAMIC (Auto-Inpaint)"
-            bg_color = (0, 255, 200)
+        if is_preset:
+            bg_str = "PRESET ROOM (Press 'P' to cycle)"
+            bg_color = (0, 242, 254)
+        elif has_background:
+            bg_str = "ROOM READY (Captured before human)"
+            bg_color = (0, 255, 0)
         else:
-            if not has_background:
-                bg_str = "STATIC: NOT SET (Press B)"
-                bg_color = (0, 0, 255)
-            else:
-                bg_str = "STATIC: READY (Press B to update)"
-                bg_color = (0, 255, 0)
+            bg_str = "STEP ASIDE 1s to capture room (or press 'P' for presets)"
+            bg_color = (0, 165, 255)
 
         cv2.putText(output, f"BG: {bg_str}", (15, 55), self.font, self.font_scale_info, bg_color, 1, cv2.LINE_AA)
 
@@ -103,7 +103,7 @@ class HUD:
             cv2.putText(output, "REC", (w - 55, 26), self.font, 0.45, (0, 0, 255), 1, cv2.LINE_AA)
 
         # Bottom Bar: Keyboard Shortcuts Legend
-        legend = "[I] Invisibility  [L] Live/Static BG  [B] Capture Snapshot  [C] Camouflage  [N] Normal  [Q] Quit"
+        legend = "[I] Invisibility  [B] Capture Room  [P] Preset BG  [C] Camouflage  [N] Normal  [Q] Quit"
         cv2.putText(output, legend, (10, h - 10), self.font, self.font_scale_legend, (220, 220, 220), 1, cv2.LINE_AA)
 
         return output
