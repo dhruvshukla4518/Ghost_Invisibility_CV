@@ -1,107 +1,141 @@
+"""
+Ghost effect rendering engine with multi-mode visual effects and ghost trails.
+"""
+
+from collections import deque
 import cv2
 import numpy as np
-from collections import deque
-from typing import Optional, List
-from config import MAX_MOTION_TRAIL_FRAMES, TRAIL_DECAY_FACTOR, AURA_GLOW_RADIUS, AURA_COLOR, COLORMAP_CHOICES, DEFAULT_COLORMAP
+import config
+from src.blending import Blender
+
 
 class GhostEffectEngine:
     """
-    Engine for creating paranormal/ghost visual effects including motion trails,
-    glowing spectral auras, colormap transformations, and scanline glitches.
+    Renders ghost visual effects, custom color shaders, neon glow, glitch artifacts,
+    and temporal ghost trails.
     """
-    def __init__(self, max_trail: int = MAX_MOTION_TRAIL_FRAMES,
-                 colormap_name: str = DEFAULT_COLORMAP):
-        self.max_trail = max_trail
-        self.trail_buffer = deque(maxlen=max_trail)
-        self.colormap_name = colormap_name.upper()
 
-        self.colormaps = {
-            "BONE": cv2.COLORMAP_BONE,
-            "OCEAN": cv2.COLORMAP_OCEAN,
-            "JET": cv2.COLORMAP_JET,
-            "PLASMA": cv2.COLORMAP_PLASMA,
-            "CYBERPUNK": cv2.COLORMAP_COOL
-        }
+    def __init__(self, blender: Blender = None):
+        self.blender = blender if blender is not None else Blender()
+        self.mode = config.DEFAULT_MODE
+        self.intensity = config.DEFAULT_GHOST_INTENSITY
+        self.ghost_trail_enabled = True
+        self.trail_queue = deque(maxlen=config.GHOST_TRAIL_LENGTH)
 
-    def cycle_colormap(self) -> str:
-        names = list(self.colormaps.keys())
-        idx = (names.index(self.colormap_name) + 1) % len(names)
-        self.colormap_name = names[idx]
-        print(f"[GHOST_EFFECT] Active spectral colormap: {self.colormap_name}")
-        return self.colormap_name
-
-    def apply_spectral_colormap(self, frame: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    def set_mode(self, mode: str):
         """
-        Applies chosen OpenCV colormap inside the masked subject area.
+        Updates active rendering mode.
         """
-        cmap_id = self.colormaps.get(self.colormap_name, cv2.COLORMAP_BONE)
+        if mode in [
+            config.MODE_NORMAL,
+            config.MODE_GHOST,
+            config.MODE_INVISIBLE,
+            config.MODE_CAMOUFLAGE,
+            config.MODE_NEON_GHOST,
+            config.MODE_GLITCH,
+        ]:
+            self.mode = mode
+            print(f"[INFO] Mode changed to: {self.mode}")
 
-        # Convert BGR to Grayscale then apply colormap
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        colored = cv2.applyColorMap(gray, cmap_id)
-
-        # Blend original frame and colormap frame inside mask
-        blended_ghost = cv2.addWeighted(frame, 0.4, colored, 0.6, 0)
-        return blended_ghost
-
-    def generate_glowing_aura(self, mask: np.ndarray,
-                              aura_color: tuple = AURA_COLOR,
-                              glow_radius: int = AURA_GLOW_RADIUS) -> np.ndarray:
+    def set_intensity(self, intensity: float):
         """
-        Extracts edges of binary mask and creates a glowing spectral neon aura frame.
+        Adjusts ghost intensity factor [0.0, 1.0].
         """
-        if glow_radius <= 0:
-            return np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+        self.intensity = float(np.clip(intensity, 0.0, 1.0))
+        self.blender.set_alpha(self.intensity)
 
-        # Canny edge detection on mask
-        edges = cv2.Canny(mask, 100, 200)
-
-        # Dilate edges to expand aura boundary
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (glow_radius, glow_radius))
-        dilated_edges = cv2.dilate(edges, kernel, iterations=2)
-
-        # Gaussian blur dilated edges to create soft glow gradient
-        ksize = glow_radius * 2 + 1
-        blurred_glow = cv2.GaussianBlur(dilated_edges, (ksize, ksize), 0)
-
-        # Colorize the glow
-        glow_canvas = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
-        norm_glow = blurred_glow.astype(np.float32) / 255.0
-
-        for i in range(3): # BGR channels
-            glow_canvas[:, :, i] = (norm_glow * aura_color[i]).astype(np.uint8)
-
-        return glow_canvas
-
-    def update_motion_trail(self, frame: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    def render(
+        self,
+        foreground: np.ndarray,
+        background: np.ndarray,
+        mask: np.ndarray,
+    ) -> np.ndarray:
         """
-        Adds current subject frame to motion trail queue and computes motion trail layer.
+        Renders the active effect onto the current frame.
         """
-        # Isolate subject from current frame
-        subject_isolated = cv2.bitwise_and(frame, frame, mask=mask)
-        self.trail_buffer.append(subject_isolated.copy())
+        if self.mode == config.MODE_NORMAL or background is None:
+            return foreground.copy()
 
-        trail_canvas = np.zeros_like(frame, dtype=np.float32)
-        total_weight = 0.0
+        if self.mode == config.MODE_INVISIBLE:
+            return self.blender.blend_invisible(foreground, background, mask)
 
-        # Accumulate past frames in queue with exponential decay
-        for idx, past_frame in enumerate(reversed(self.trail_buffer)):
-            weight = (TRAIL_DECAY_FACTOR ** idx)
-            trail_canvas += past_frame.astype(np.float32) * weight
-            total_weight += weight
+        if self.mode == config.MODE_CAMOUFLAGE:
+            return self.blender.blend_camouflage(foreground, background, mask)
 
-        if total_weight > 0:
-            trail_canvas /= total_weight
+        if self.mode == config.MODE_GHOST:
+            base_ghost = self.blender.blend_ghost(foreground, background, mask, alpha=self.intensity)
+            if self.ghost_trail_enabled:
+                return self._apply_ghost_trail(base_ghost, foreground, mask)
+            return base_ghost
 
-        return trail_canvas.astype(np.uint8)
+        if self.mode == config.MODE_NEON_GHOST:
+            return self._render_neon_ghost(foreground, background, mask)
 
-    def apply_scanline_glitch(self, frame: np.ndarray, line_spacing: int = 6) -> np.ndarray:
+        if self.mode == config.MODE_GLITCH:
+            return self._render_glitch_ghost(foreground, background, mask)
+
+        return foreground.copy()
+
+    def _apply_ghost_trail(self, base_output: np.ndarray, foreground: np.ndarray, mask: np.ndarray) -> np.ndarray:
         """
-        Applies subtle horizontal scanlines across frame for futuristic ghost aesthetic.
+        Composites past ghost frames with decaying alpha for a motion trail effect.
         """
-        glitch = frame.copy()
-        glitch[::line_spacing, :, :] = (glitch[::line_spacing, :, :] * 0.7).astype(np.uint8)
-        return glitch
+        self.trail_queue.append(foreground.copy())
 
-    def reset(self):
-        self.trail_buffer.clear()
+        if len(self.trail_queue) < 2:
+            return base_output
+
+        output = base_output.astype(np.float32)
+        n = len(self.trail_queue)
+
+        if len(mask.shape) == 2:
+            mask_3d = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
+        else:
+            mask_3d = mask
+
+        for i, past_frame in enumerate(reversed(self.trail_queue)):
+            decay = 0.15 * (1.0 - i / float(n))
+            trail_blend = past_frame.astype(np.float32) * mask_3d * decay
+            output = cv2.add(output, trail_blend)
+
+        return np.clip(output, 0, 255).astype(np.uint8)
+
+    def _render_neon_ghost(self, foreground: np.ndarray, background: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        """
+        Renders a cyan/magenta chromatic neon outline around the ghost figure.
+        """
+        # Base ghost blend
+        ghost_base = self.blender.blend_ghost(foreground, background, mask, alpha=self.intensity)
+
+        # Detect edge boundaries of mask
+        mask_uint8 = (mask * 255).astype(np.uint8)
+        edges = cv2.Canny(mask_uint8, 50, 150)
+        edges_dilated = cv2.dilate(edges, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)), iterations=2)
+
+        # Create cyan/magenta neon edge color map
+        neon_layer = np.zeros_like(foreground)
+        neon_layer[:, :, 0] = edges_dilated  # Cyan Blue
+        neon_layer[:, :, 1] = edges_dilated  # Cyan Green
+        neon_layer[:, :, 2] = (edges_dilated * 0.7).astype(np.uint8)  # Magenta/Pink accent
+
+        # Add neon glow onto ghost frame
+        result = cv2.addWeighted(ghost_base, 1.0, neon_layer, 0.8, 0)
+        return result
+
+    def _render_glitch_ghost(self, foreground: np.ndarray, background: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        """
+        Applies random digital displacement/glitch artifacts within the person region.
+        """
+        glitched_fg = foreground.copy()
+        h, w = foreground.shape[:2]
+
+        # Shift random horizontal scanlines
+        num_glitches = np.random.randint(3, 10)
+        for _ in range(num_glitches):
+            y1 = np.random.randint(0, h - 20)
+            height = np.random.randint(5, 20)
+            shift = np.random.randint(-25, 25)
+
+            glitched_fg[y1 : y1 + height, :] = np.roll(glitched_fg[y1 : y1 + height, :], shift, axis=1)
+
+        return self.blender.blend_ghost(glitched_fg, background, mask, alpha=self.intensity)

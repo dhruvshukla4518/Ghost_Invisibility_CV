@@ -1,86 +1,95 @@
-import os
+"""
+Image and output file management utilities.
+"""
+
+import datetime
+from pathlib import Path
 import cv2
-import time
 import numpy as np
-from typing import Tuple, Optional
-from config import SCREENSHOTS_DIR, VIDEOS_DIR
+import requests
 
-def resize_keep_aspect(image: np.ndarray, target_width: int, target_height: int) -> np.ndarray:
+import config
+
+
+def save_screenshot(frame: np.ndarray, output_dir: Path = config.OUTPUT_SCREENSHOTS_DIR) -> str:
     """
-    Resizes an image maintaining aspect ratio and pads to fit target resolution exactly.
+    Saves the provided image frame with a timestamped filename.
     """
-    h, w = image.shape[:2]
-    scale = min(target_width / w, target_height / h)
-    new_w, new_h = int(w * scale), int(h * scale)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+    filename = f"ghost_capture_{timestamp}.png"
+    filepath = output_dir / filename
+    
+    success = cv2.imwrite(str(filepath), frame)
+    if success:
+        print(f"[INFO] Screenshot saved to: {filepath}")
+        return str(filepath)
+    else:
+        print(f"[ERROR] Failed to save screenshot to: {filepath}")
+        return ""
 
-    resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
-
-    # Create padded black background canvas
-    canvas = np.zeros((target_height, target_width, 3), dtype=np.uint8)
-    x_offset = (target_width - new_w) // 2
-    y_offset = (target_height - new_h) // 2
-
-    canvas[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
-    return canvas
-
-def save_screenshot(frame: np.ndarray, prefix: str = "ghost_cv") -> str:
-    """
-    Saves current frame to output screenshots directory with timestamp filename.
-    """
-    os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    filename = f"{prefix}_{timestamp}.png"
-    filepath = os.path.join(SCREENSHOTS_DIR, filename)
-
-    cv2.imwrite(filepath, frame)
-    print(f"[IMAGE_UTILS] Screenshot saved: {filepath}")
-    return filepath
 
 class VideoRecorder:
     """
-    Helper to record real-time video output to MP4 files using OpenCV VideoWriter.
+    Manages real-time video recording to disk.
     """
-    def __init__(self, width: int, height: int, fps: float = 30.0, prefix: str = "ghost_cv_rec"):
-        self.width = width
-        self.height = height
+
+    def __init__(self, output_dir: Path = config.OUTPUT_VIDEOS_DIR, fps: int = config.FPS):
+        self.output_dir = output_dir
         self.fps = fps
-        self.prefix = prefix
-        self.writer: Optional[cv2.VideoWriter] = None
-        self.filepath: Optional[str] = None
-        self.is_recording: bool = False
+        self.writer = None
+        self.is_recording = False
+        self.output_path = ""
 
-    def start(self) -> str:
-        os.makedirs(VIDEOS_DIR, exist_ok=True)
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        filename = f"{self.prefix}_{timestamp}.mp4"
-        self.filepath = os.path.join(VIDEOS_DIR, filename)
+    def start(self, frame_width: int, frame_height: int):
+        """
+        Initializes video writer for recording.
+        """
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"ghost_video_{timestamp}.mp4"
+        self.output_path = str(self.output_dir / filename)
 
-        # Try mp4v codec, fallback to MJPG / XVID if needed
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        self.writer = cv2.VideoWriter(self.filepath, fourcc, self.fps, (self.width, self.height))
-
-        if not self.writer.isOpened():
-            # Fallback codec
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            self.filepath = self.filepath.replace('.mp4', '.avi')
-            self.writer = cv2.VideoWriter(self.filepath, fourcc, self.fps, (self.width, self.height))
-
+        self.writer = cv2.VideoWriter(self.output_path, fourcc, self.fps, (frame_width, frame_height))
         self.is_recording = True
-        print(f"[VIDEO_RECORDER] Recording started: {self.filepath}")
-        return self.filepath
+        print(f"[INFO] Video recording started: {self.output_path}")
 
-    def write_frame(self, frame: np.ndarray):
+    def write(self, frame: np.ndarray):
+        """
+        Writes a single frame to the video file.
+        """
         if self.is_recording and self.writer is not None:
-            # Ensure frame matches target size
-            if frame.shape[1] != self.width or frame.shape[0] != self.height:
-                frame = cv2.resize(frame, (self.width, self.height))
             self.writer.write(frame)
 
-    def stop(self) -> Optional[str]:
+    def stop(self):
+        """
+        Stops recording and releases video writer resources.
+        """
         if self.is_recording and self.writer is not None:
             self.writer.release()
             self.writer = None
             self.is_recording = False
-            print(f"[VIDEO_RECORDER] Recording saved & stopped: {self.filepath}")
-            return self.filepath
-        return None
+            print(f"[INFO] Video recording saved to: {self.output_path}")
+
+
+def download_file_if_missing(url: str, destination: Path) -> bool:
+    """
+    Downloads a remote file if it does not exist locally.
+    """
+    if destination.exists():
+        return True
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[INFO] Downloading model file from {url} to {destination}...")
+    try:
+        response = requests.get(url, stream=True, timeout=15)
+        response.raise_for_status()
+        with open(destination, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print(f"[INFO] Download completed: {destination}")
+        return True
+    except Exception as e:
+        print(f"[WARNING] Could not download file from {url}: {e}")
+        return False

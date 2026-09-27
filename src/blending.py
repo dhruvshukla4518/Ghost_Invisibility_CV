@@ -1,77 +1,132 @@
+"""
+Alpha blending engine for ghost and invisibility compositing.
+"""
+
 import cv2
 import numpy as np
-from typing import Tuple, Optional
-from config import OperationalMode, DEFAULT_GHOST_OPACITY
+import config
+
 
 class Blender:
     """
-    Seamless multi-layer alpha compositor for blending live camera feed,
-    background frame, ghost visual effects, and soft binary/alpha masks.
+    Combines foreground camera frame, captured background frame,
+    and refined person mask using alpha compositing equations.
     """
-    def __init__(self, opacity: float = DEFAULT_GHOST_OPACITY):
-        self.opacity = opacity # 0.0 = completely invisible background, 1.0 = fully opaque foreground
 
-    def set_opacity(self, opacity: float):
-        self.opacity = max(0.0, min(1.0, opacity))
+    def __init__(self, default_alpha: float = config.DEFAULT_ALPHA):
+        self.alpha = default_alpha
 
-    def blend(self, mode: OperationalMode,
-              live_frame: np.ndarray,
-              bg_frame: np.ndarray,
-              mask: np.ndarray,
-              soft_mask: np.ndarray,
-              ghost_layer: Optional[np.ndarray] = None,
-              aura_layer: Optional[np.ndarray] = None) -> np.ndarray:
+    def set_alpha(self, alpha: float):
         """
-        Main composition function that returns final composite image depending on active OperationalMode.
+        Updates blending alpha factor in range [0.0, 1.0].
         """
-        # Ensure dimensions match live frame
-        h, w = live_frame.shape[:2]
-        if bg_frame.shape[:2] != (h, w):
-            bg_frame = cv2.resize(bg_frame, (w, h))
+        self.alpha = float(np.clip(alpha, 0.0, 1.0))
 
-        if mode == OperationalMode.NORMAL:
-            return live_frame.copy()
+    def get_alpha(self) -> float:
+        return self.alpha
 
-        elif mode == OperationalMode.CLOAK:
-            # Full Invisibility Cloak
-            # Masked area = Background Frame, Unmasked area = Live Frame
-            # Smooth 3-channel alpha blending using soft_mask
-            alpha_3d = np.repeat(soft_mask[:, :, np.newaxis], 3, axis=2)
+    def _ensure_matching_shape(self, bg: np.ndarray, target_fg: np.ndarray) -> np.ndarray:
+        """
+        Resizes background image if shape does not match target foreground frame.
+        """
+        if bg is None:
+            return target_fg.copy()
+        h, w = target_fg.shape[:2]
+        if bg.shape[:2] != (h, w):
+            return cv2.resize(bg, (w, h))
+        return bg
 
-            # Invisibility cloak blends bg_frame into masked region
-            # opacity parameter allows user to adjust cloak transparency!
-            effective_bg = cv2.addWeighted(bg_frame, 1.0 - self.opacity, live_frame, self.opacity, 0)
+    def blend_ghost(
+        self,
+        foreground: np.ndarray,
+        background: np.ndarray,
+        mask: np.ndarray,
+        alpha: float = None,
+    ) -> np.ndarray:
+        """
+        Performs ghost compositing:
+        Inside person mask: blend foreground with background scaled by alpha.
+        Outside person mask: show current foreground.
+        """
+        if alpha is None:
+            alpha = self.alpha
 
-            composite = (effective_bg * alpha_3d + live_frame * (1.0 - alpha_3d)).astype(np.uint8)
-            return composite
+        if background is None:
+            return foreground.copy()
 
-        elif mode == OperationalMode.GHOST:
-            # Ghost Phantom Mode
-            # Blends live frame, ghost spectral layer, motion trail, aura, and background
-            alpha_3d = np.repeat(soft_mask[:, :, np.newaxis], 3, axis=2)
+        background = self._ensure_matching_shape(background, foreground)
 
-            # Base composition inside subject mask: blend live subject with ghost layer (colormap / motion trail)
-            if ghost_layer is not None:
-                phantom_subject = cv2.addWeighted(live_frame, 0.4, ghost_layer, 0.6, 0)
-            else:
-                phantom_subject = live_frame.copy()
+        if len(mask.shape) == 2:
+            mask_3d = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
+        else:
+            mask_3d = mask
 
-            # Blend phantom subject with background frame according to self.opacity
-            blended_phantom = cv2.addWeighted(phantom_subject, self.opacity, bg_frame, 1.0 - self.opacity, 0)
+        fg_float = foreground.astype(np.float32)
+        bg_float = background.astype(np.float32)
 
-            # Compose subject region over background
-            composite = (blended_phantom * alpha_3d + bg_frame * (1.0 - alpha_3d)).astype(np.uint8)
+        # Ghost region blend
+        ghost_region = alpha * fg_float + (1.0 - alpha) * bg_float
 
-            # Add glowing spectral aura if available
-            if aura_layer is not None:
-                composite = cv2.add(composite, aura_layer)
+        # Composite ghost region inside person mask, keeping normal scene outside
+        output_float = mask_3d * ghost_region + (1.0 - mask_3d) * fg_float
 
-            return composite
+        return np.clip(output_float, 0, 255).astype(np.uint8)
 
-        elif mode == OperationalMode.SWAP:
-            # Background Swap (Keep subject, replace rest of scene with background frame)
-            alpha_3d = np.repeat(soft_mask[:, :, np.newaxis], 3, axis=2)
-            composite = (live_frame * alpha_3d + bg_frame * (1.0 - alpha_3d)).astype(np.uint8)
-            return composite
+    def blend_invisible(
+        self,
+        foreground: np.ndarray,
+        background: np.ndarray,
+        mask: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Performs pure invisibility compositing:
+        Inside person mask: replace 100% with clean background.
+        Outside person mask: keep current live camera foreground.
+        """
+        if background is None:
+            return foreground.copy()
 
-        return live_frame.copy()
+        background = self._ensure_matching_shape(background, foreground)
+
+        if len(mask.shape) == 2:
+            mask_3d = np.repeat(mask[:, :, np.newaxis], 3, axis=2)
+        else:
+            mask_3d = mask
+
+        fg_float = foreground.astype(np.float32)
+        bg_float = background.astype(np.float32)
+
+        # Background inside person mask, live camera outside
+        output_float = mask_3d * bg_float + (1.0 - mask_3d) * fg_float
+
+        return np.clip(output_float, 0, 255).astype(np.uint8)
+
+    def blend_camouflage(
+        self,
+        foreground: np.ndarray,
+        background: np.ndarray,
+        mask: np.ndarray,
+        distortion: float = 12.0,
+    ) -> np.ndarray:
+        """
+        Active optical camouflage: refracts the live background across
+        the human body boundary for a predator-style transparent cloak.
+        """
+        if background is None:
+            background = foreground.copy()
+        background = self._ensure_matching_shape(background, foreground)
+        h, w = foreground.shape[:2]
+
+        # Calculate gradients of the mask to create refraction map
+        grad_x = cv2.Sobel(mask, cv2.CV_32F, 1, 0, ksize=5)
+        grad_y = cv2.Sobel(mask, cv2.CV_32F, 0, 1, ksize=5)
+
+        # Coordinate grid
+        grid_x, grid_y = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
+
+        # Displace grid by mask boundary gradients
+        map_x = np.clip(grid_x + grad_x * distortion, 0, w - 1).astype(np.float32)
+        map_y = np.clip(grid_y + grad_y * distortion, 0, h - 1).astype(np.float32)
+
+        refracted_bg = cv2.remap(background, map_x, map_y, cv2.INTER_LINEAR)
+        return self.blend_invisible(foreground, refracted_bg, mask)

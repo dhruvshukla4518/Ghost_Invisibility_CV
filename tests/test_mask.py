@@ -1,38 +1,36 @@
+"""
+Unit tests for mask processing and refinement module.
+"""
+
 import pytest
 import numpy as np
-import os
-import sys
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from src.mask_processing import MaskProcessor
 
-def test_mask_cleaning_noise_removal():
-    processor = MaskProcessor(kernel_size=5, min_area=100)
-    # Create mask with single small noise spot (5x5 pixels = area 25 < min_area 100)
-    raw_mask = np.zeros((100, 100), dtype=np.uint8)
-    raw_mask[10:15, 10:15] = 255
 
-    cleaned = processor.clean_mask(raw_mask)
-    # Small noise spot should be removed (all zeros)
-    assert np.max(cleaned) == 0
+def test_mask_processor_smoothing():
+    processor = MaskProcessor(threshold=0.5)
+    raw_mask = np.zeros((100, 100), dtype=np.float32)
+    # Add a square person mask region in the center
+    raw_mask[30:70, 30:70] = 0.95
+    # Add speckle noise
+    raw_mask[10, 10] = 0.9
 
-def test_mask_cleaning_valid_contour():
-    processor = MaskProcessor(kernel_size=5, min_area=100)
-    # Create valid large box contour (50x50 pixels = area 2500 > min_area 100)
-    raw_mask = np.zeros((100, 100), dtype=np.uint8)
-    raw_mask[20:70, 20:70] = 255
+    refined_mask = processor.process(raw_mask)
 
-    cleaned = processor.clean_mask(raw_mask)
-    assert np.max(cleaned) == 255
-    assert np.count_nonzero(cleaned) > 2000
+    assert refined_mask is not None
+    assert refined_mask.shape == (100, 100)
+    assert refined_mask.dtype == np.float32
+    assert np.min(refined_mask) >= 0.0
+    assert np.max(refined_mask) <= 1.0
 
-def test_soft_mask_generation():
-    processor = MaskProcessor(blur_sigma=3.0)
-    raw_mask = np.zeros((100, 100), dtype=np.uint8)
-    raw_mask[20:80, 20:80] = 255
+    # Speckle noise at (10, 10) should be removed by opening
+    assert refined_mask[10, 10] < 0.1
 
-    soft_mask = processor.get_soft_mask(raw_mask)
-    assert soft_mask.shape == (100, 100)
-    assert soft_mask.dtype == np.float32
-    assert 0.0 <= soft_mask.min() <= soft_mask.max() <= 1.0
+
+def test_mask_processor_empty_mask():
+    processor = MaskProcessor()
+    empty_mask = np.array([], dtype=np.float32)
+
+    refined = processor.process(empty_mask)
+    assert refined is not None
+    assert np.all(refined == 0.0)

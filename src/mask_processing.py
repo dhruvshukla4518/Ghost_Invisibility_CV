@@ -1,63 +1,78 @@
+"""
+Mask processing and refinement module.
+"""
+
 import cv2
 import numpy as np
-from typing import Tuple
-from config import MORPH_KERNEL_SIZE, GAUSSIAN_BLUR_SIGMA, MIN_CONTOUR_AREA
+import config
+
 
 class MaskProcessor:
     """
-    Refines raw binary segmentation masks using morphological cleanup,
-    noise filtering, contour filtering, and edge-softening blurs.
+    Refines raw probability segmentation masks using morphological operations,
+    boundary dilation expansion, and Gaussian edge softening.
     """
-    def __init__(self, kernel_size: int = MORPH_KERNEL_SIZE,
-                 blur_sigma: float = GAUSSIAN_BLUR_SIGMA,
-                 min_area: int = MIN_CONTOUR_AREA):
-        self.kernel_size = kernel_size if kernel_size % 2 != 0 else kernel_size + 1
-        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (self.kernel_size, self.kernel_size))
-        self.blur_sigma = blur_sigma
-        self.min_area = min_area
 
-    def clean_mask(self, raw_mask: np.ndarray) -> np.ndarray:
-        """
-        Applies morphological opening (noise removal) and closing (hole filling).
-        Filters out small isolated noise contours.
-        """
-        # Morphological Opening (remove white noise pixels)
-        opened = cv2.morphologyEx(raw_mask, cv2.MORPH_OPEN, self.kernel, iterations=2)
+    def __init__(
+        self,
+        threshold: float = 0.35,
+        morph_kernel_size: tuple = (7, 7),
+        blur_kernel_size: tuple = (21, 21),
+        erode_iters: int = 0,
+        dilate_iters: int = 3,
+    ):
+        self.threshold = threshold
+        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, morph_kernel_size)
+        self.blur_kernel_size = blur_kernel_size
+        self.erode_iters = erode_iters
+        self.dilate_iters = dilate_iters
 
-        # Morphological Dilate/Closing (fill gaps inside mask)
-        dilated = cv2.dilate(opened, self.kernel, iterations=1)
-        closed = cv2.morphologyEx(dilated, cv2.MORPH_CLOSE, self.kernel, iterations=2)
-
-        # Filter contours by minimum area
-        cleaned = self._filter_contours(closed)
-        return cleaned
-
-    def _filter_contours(self, mask: np.ndarray) -> np.ndarray:
+    def process(self, raw_mask: np.ndarray) -> np.ndarray:
         """
-        Finds contours in binary mask and keeps only those above MIN_CONTOUR_AREA.
+        Processes float raw_mask [0.0, 1.0] and returns a refined float mask [0.0, 1.0].
         """
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        filtered_mask = np.zeros_like(mask)
+        if raw_mask is None or raw_mask.size == 0:
+            return np.zeros((config.FRAME_HEIGHT, config.FRAME_WIDTH), dtype=np.float32)
+
+        h, w = raw_mask.shape[:2]
+
+        # 1. Binarize raw mask at low threshold to capture all hand & finger pixels
+        binary_uint8 = (raw_mask > self.threshold).astype(np.uint8) * 255
+
+        # 2. Morphological Closing (Fill gaps inside hands, fingers, hair, torso)
+        closed = cv2.morphologyEx(binary_uint8, cv2.MORPH_CLOSE, self.kernel, iterations=2)
+
+        # 3. Morphological Opening (Clean small background specks)
+        opened = cv2.morphologyEx(closed, cv2.MORPH_OPEN, self.kernel, iterations=1)
+
+        # 4. Contour Area Filtering (Keep substantial human contours)
+        filtered = self._filter_contours(opened, min_area=300)
+
+        # 5. Boundary Dilation Expansion (Expands mask slightly so no hand/finger fringes remain)
+        if self.dilate_iters > 0:
+            filtered = cv2.dilate(filtered, self.kernel, iterations=self.dilate_iters)
+
+        # 6. Gaussian Blur Edge Softening / Feathering
+        k_w = self.blur_kernel_size[0] if self.blur_kernel_size[0] % 2 == 1 else self.blur_kernel_size[0] + 1
+        k_h = self.blur_kernel_size[1] if self.blur_kernel_size[1] % 2 == 1 else self.blur_kernel_size[1] + 1
+
+        blurred = cv2.GaussianBlur(filtered.astype(np.float32), (k_w, k_h), sigmaX=0)
+
+        # Normalize back to float32 range [0.0, 1.0]
+        smooth_mask = np.clip(blurred / 255.0, 0.0, 1.0).astype(np.float32)
+
+        return smooth_mask
+
+    def _filter_contours(self, binary_mask: np.ndarray, min_area: int = 300) -> np.ndarray:
+        """
+        Finds contours in binary mask and retains contours with area >= min_area.
+        """
+        contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        output_mask = np.zeros_like(binary_mask)
 
         for cnt in contours:
             area = cv2.contourArea(cnt)
-            if area >= self.min_area:
-                cv2.drawContours(filtered_mask, [cnt], -1, 255, -1)
+            if area >= min_area:
+                cv2.drawContours(output_mask, [cnt], -1, 255, -1)
 
-        return filtered_mask
-
-    def get_soft_mask(self, binary_mask: np.ndarray) -> np.ndarray:
-        """
-        Generates a smooth float normalized alpha mask [0.0 - 1.0] with Gaussian blurred edges
-        to avoid harsh pixelated edges during image blending.
-        """
-        if self.blur_sigma <= 0:
-            return (binary_mask / 255.0).astype(np.float32)
-
-        ksize = int(self.blur_sigma * 3)
-        if ksize % 2 == 0:
-            ksize += 1
-
-        blurred = cv2.GaussianBlur(binary_mask, (ksize, ksize), self.blur_sigma)
-        soft_mask = (blurred / 255.0).astype(np.float32)
-        return soft_mask
+        return output_mask
