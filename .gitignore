@@ -1,25 +1,29 @@
-# Python bytecode & cache
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-.pytest_cache/
+*.so
+.Python
 
-# Virtual environments
-venv/
-env/
+# Virtual Environment
 .venv/
+env/
+venv/
+ENV/
 
-# Large binaries & downloaded models
-assets/*.tflite
-assets/*.task
+# Testing & Cache
+.pytest_cache/
+.pytest_cache.zip
+.coverage
+htmlcov/
 
-# User outputs & recordings
+# Outputs (screenshots & videos)
 outputs/screenshots/*.png
 outputs/videos/*.mp4
-outputs/videos/*.avi
-assets/backgrounds/clean_background.png
+!outputs/screenshots/.gitkeep
+!outputs/videos/.gitkeep
 
-# IDE / OS settings
+# IDE & OS
 .vscode/
 .idea/
 .DS_Store

@@ -1,128 +1,116 @@
-"""
-Webcam capture manager with synthetic fallback capability.
-"""
-
-import time
 import cv2
 import numpy as np
-import config
+import time
+from typing import Tuple, Optional
+from config import DEFAULT_CAMERA_ID, DEFAULT_FRAME_WIDTH, DEFAULT_FRAME_HEIGHT
 
+class SyntheticCamera:
+    """
+    Generates synthetic video frames with animated subjects and backgrounds
+    for testing when physical webcam is not present.
+    """
+    def __init__(self, width: int = DEFAULT_FRAME_WIDTH, height: int = DEFAULT_FRAME_HEIGHT):
+        self.width = width
+        self.height = height
+        self.start_time = time.time()
+        # Pre-generate static background image
+        self.bg_frame = np.zeros((height, width, 3), dtype=np.uint8)
+        # Create a cool geometric grid background
+        for y in range(0, height, 40):
+            cv2.line(self.bg_frame, (0, y), (width, y), (40, 40, 50), 1)
+        for x in range(0, width, 40):
+            cv2.line(self.bg_frame, (x, 0), (x, height), (40, 40, 50), 1)
+        cv2.putText(self.bg_frame, "SYNTHETIC BACKGROUND FRAME", (width // 2 - 250, height // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (100, 150, 100), 2)
+
+    def read(self) -> Tuple[bool, np.ndarray]:
+        t = time.time() - self.start_time
+        # Start with static background frame copy
+        frame = self.bg_frame.copy()
+
+        # Animate a bouncing "human cloak target" (Red/Green rectangle & circle)
+        cx = int(self.width / 2 + np.sin(t * 1.5) * (self.width * 0.3))
+        cy = int(self.height / 2 + np.cos(t * 2.0) * (self.height * 0.2))
+
+        # Draw red cloak region (pure RED for HSV segmentation testing)
+        cv2.rectangle(frame, (cx - 80, cy - 100), (cx + 80, cy + 120), (0, 0, 220), -1) # BGR Red
+        cv2.circle(frame, (cx, cy - 130), 40, (200, 180, 150), -1) # Skin-colored head
+
+        # Add text label on animated object
+        cv2.putText(frame, "Synthetic Cloak Subject", (cx - 90, cy + 150),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        return True, frame
 
 class CameraManager:
     """
-    Manages webcam acquisition and frame generation.
-    Supports synthetic frame generator for testing/demo without webcam.
+    Manages live camera capture via OpenCV VideoCapture, automatically falling back
+    to SyntheticCamera if hardware is unavailable.
     """
-
-    def __init__(
-        self,
-        camera_index: int = config.CAMERA_INDEX,
-        width: int = config.FRAME_WIDTH,
-        height: int = config.FRAME_HEIGHT,
-        force_synthetic: bool = False,
-    ):
-        self.camera_index = camera_index
+    def __init__(self, camera_id: int = DEFAULT_CAMERA_ID,
+                 width: int = DEFAULT_FRAME_WIDTH,
+                 height: int = DEFAULT_FRAME_HEIGHT,
+                 force_synthetic: bool = False):
+        self.camera_id = camera_id
         self.width = width
         self.height = height
         self.is_synthetic = force_synthetic
-        self.cap = None
-        self.frame_count = 0
-        self.start_time = time.time()
+        self.cap: Optional[cv2.VideoCapture] = None
+        self.synth_cam: Optional[SyntheticCamera] = None
 
-        if not self.is_synthetic:
-            self._initialize_camera()
-
-        if self.cap is None or not self.cap.isOpened():
-            print("[WARNING] Hardware camera unavailable. Switching to Synthetic Camera Feed.")
-            self.is_synthetic = True
-
-    def _initialize_camera(self):
-        """
-        Attempts to open hardware webcam device.
-        """
-        try:
-            self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW if cv2.os.name == 'nt' else cv2.CAP_ANY)
-            if not self.cap.isOpened():
-                self.cap = cv2.VideoCapture(self.camera_index)
-
-            if self.cap.isOpened():
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-                # Read actual dimensions
-                actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                if actual_w > 0 and actual_h > 0:
-                    self.width = actual_w
-                    self.height = actual_h
-                print(f"[INFO] Camera initialized successfully ({self.width}x{self.height}).")
-            else:
-                print("[ERROR] Unable to access webcam. Please check camera permissions.")
-        except Exception as e:
-            print(f"[ERROR] Exception during camera initialization: {e}")
-            self.cap = None
-
-    def read(self) -> tuple[bool, np.ndarray]:
-        """
-        Reads next frame from webcam or generates synthetic frame.
-        Returns (success, frame_bgr).
-        """
-        if not self.is_synthetic and self.cap is not None and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret and frame is not None and frame.size > 0:
-                if frame.shape[1] != self.width or frame.shape[0] != self.height:
-                    frame = cv2.resize(frame, (self.width, self.height))
-                return True, frame
-            else:
-                print("[WARNING] Invalid or empty frame received from camera.")
-                return False, np.zeros((self.height, self.width, 3), dtype=np.uint8)
+        if force_synthetic:
+            self._init_synthetic()
         else:
-            return True, self._generate_synthetic_frame()
+            self._init_hardware()
 
-    def _generate_synthetic_frame(self) -> np.ndarray:
-        """
-        Generates a dynamic synthetic frame simulating room background + moving person.
-        """
-        self.frame_count += 1
-        t = time.time() - self.start_time
+    def _init_hardware(self):
+        print(f"[CAMERA] Attempting to initialize camera ID {self.camera_id} ({self.width}x{self.height})...")
+        self.cap = cv2.VideoCapture(self.camera_id, cv2.CAP_DSHOW if cv2.os.name == 'nt' else cv2.CAP_ANY)
 
-        # Create room background (gradient wall + floor)
-        frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        for y in range(self.height):
-            ratio = y / float(self.height)
-            frame[y, :, 0] = int(180 - ratio * 60)  # B
-            frame[y, :, 1] = int(140 - ratio * 40)  # G
-            frame[y, :, 2] = int(100 + ratio * 80)  # R
+        if not self.cap.isOpened():
+            print(f"[CAMERA] Warning: Unable to open camera ID {self.camera_id}. Switching to Synthetic Camera.")
+            self._init_synthetic()
+            return
 
-        # Draw static room furniture/grid lines
-        cv2.rectangle(frame, (50, 200), (180, 450), (60, 40, 30), -1)
-        cv2.rectangle(frame, (460, 150), (590, 450), (40, 60, 80), -1)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
 
-        # Draw moving person (head, body, arms) moving left-right
-        offset_x = int(np.sin(t * 1.5) * 80)
-        center_x = self.width // 2 + offset_x
-        center_y = self.height // 2 + 30
-
-        # Person shirt color
-        shirt_color = (40, 120, 220)  # Blue/Orange mix
-        head_color = (180, 200, 220)  # Skin tone tint
-
-        # Body (ellipse/capsule)
-        cv2.ellipse(frame, (center_x, center_y + 40), (45, 90), 0, 0, 360, shirt_color, -1)
-        # Head (circle)
-        cv2.circle(frame, (center_x, center_y - 65), 35, head_color, -1)
-
-        # Draw a moving hand raised for gesture demo (toggling between open palm & fist)
-        hand_x = center_x + 65 + int(np.sin(t * 3.0) * 15)
-        hand_y = center_y - 40 + int(np.cos(t * 3.0) * 15)
-        cv2.circle(frame, (hand_x, hand_y), 15, head_color, -1)
-
-        return frame
-
-    def release(self):
-        """
-        Releases camera resource.
-        """
-        if self.cap is not None:
+        # Verify frame read
+        ret, frame = self.cap.read()
+        if not ret or frame is None:
+            print("[CAMERA] Warning: Camera opened but failed to read frame. Switching to Synthetic Camera.")
             self.cap.release()
             self.cap = None
-            print("[INFO] Camera released.")
+            self._init_synthetic()
+        else:
+            self.height, self.width = frame.shape[:2]
+            print(f"[CAMERA] Physical camera active. Resolution: {self.width}x{self.height}")
+
+    def _init_synthetic(self):
+        self.is_synthetic = True
+        self.synth_cam = SyntheticCamera(self.width, self.height)
+        print(f"[CAMERA] Synthetic camera active ({self.width}x{self.height}).")
+
+    def read(self) -> Tuple[bool, np.ndarray]:
+        if self.is_synthetic and self.synth_cam is not None:
+            return self.synth_cam.read()
+
+        if self.cap is not None:
+            ret, frame = self.cap.read()
+            if not ret or frame is None:
+                print("[CAMERA] Frame dropped. Switching to synthetic fallback.")
+                self._init_synthetic()
+                return self.synth_cam.read()
+            # Flip horizontally for natural mirror feel
+            frame = cv2.flip(frame, 1)
+            return True, frame
+
+        return False, np.zeros((self.height, self.width, 3), dtype=np.uint8)
+
+    def get_resolution(self) -> Tuple[int, int]:
+        return self.width, self.height
+
+    def release(self):
+        if self.cap is not None and self.cap.isOpened():
+            self.cap.release()
+            print("[CAMERA] Camera hardware released.")

@@ -1,62 +1,55 @@
-"""
-Unit tests for alpha blending and camouflage engine.
-"""
-
 import pytest
 import numpy as np
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from src.blending import Blender
+from config import OperationalMode
 
+def test_blender_cloak_mode():
+    blender = Blender(opacity=0.0) # Full invisibility cloak
 
-def test_blend_ghost_alpha_zero():
-    blender = Blender(default_alpha=0.0)
-    fg = np.ones((50, 50, 3), dtype=np.uint8) * 200  # Light Gray
-    bg = np.ones((50, 50, 3), dtype=np.uint8) * 50   # Dark Gray
-    mask = np.ones((50, 50), dtype=np.float32)       # Full person mask
+    # Live frame: Red (BGR: 0, 0, 255)
+    live_frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    live_frame[:, :] = (0, 0, 255)
 
-    # Alpha 0.0 means 100% background inside person region
-    result = blender.blend_ghost(fg, bg, mask, alpha=0.0)
+    # BG frame: Blue (BGR: 255, 0, 0)
+    bg_frame = np.zeros((100, 100, 3), dtype=np.uint8)
+    bg_frame[:, :] = (255, 0, 0)
 
-    assert result is not None
-    assert result.shape == (50, 50, 3)
-    assert np.allclose(result, 50, atol=2)
+    # Full mask (100x100)
+    mask = np.ones((100, 100), dtype=np.uint8) * 255
+    soft_mask = np.ones((100, 100), dtype=np.float32)
 
+    composite = blender.blend(
+        mode=OperationalMode.CLOAK,
+        live_frame=live_frame,
+        bg_frame=bg_frame,
+        mask=mask,
+        soft_mask=soft_mask
+    )
 
-def test_blend_ghost_alpha_one():
-    blender = Blender(default_alpha=1.0)
-    fg = np.ones((50, 50, 3), dtype=np.uint8) * 200
-    bg = np.ones((50, 50, 3), dtype=np.uint8) * 50
-    mask = np.ones((50, 50), dtype=np.float32)
+    assert composite.shape == (100, 100, 3)
+    # Inside masked region with opacity=0.0, output should match bg_frame (Blue)
+    assert np.array_equal(composite[50, 50], [255, 0, 0])
 
-    # Alpha 1.0 means 100% foreground inside person region
-    result = blender.blend_ghost(fg, bg, mask, alpha=1.0)
-
-    assert result is not None
-    assert np.allclose(result, 200, atol=2)
-
-
-def test_blend_invisible():
+def test_blender_normal_mode():
     blender = Blender()
-    fg = np.ones((50, 50, 3), dtype=np.uint8) * 200
-    bg = np.ones((50, 50, 3), dtype=np.uint8) * 50
-    mask = np.zeros((50, 50), dtype=np.float32)
-    mask[10:40, 10:40] = 1.0  # Center square is person
 
-    result = blender.blend_invisible(fg, bg, mask)
+    live_frame = np.zeros((50, 50, 3), dtype=np.uint8)
+    live_frame[:, :] = (0, 255, 0) # Green
+    bg_frame = np.zeros((50, 50, 3), dtype=np.uint8)
+    mask = np.zeros((50, 50), dtype=np.uint8)
+    soft_mask = np.zeros((50, 50), dtype=np.float32)
 
-    # Center square should be background (50)
-    assert np.allclose(result[25, 25], [50, 50, 50], atol=2)
-    # Outside should be foreground (200)
-    assert np.allclose(result[5, 5], [200, 200, 200], atol=2)
+    composite = blender.blend(
+        mode=OperationalMode.NORMAL,
+        live_frame=live_frame,
+        bg_frame=bg_frame,
+        mask=mask,
+        soft_mask=soft_mask
+    )
 
-
-def test_blend_camouflage():
-    blender = Blender()
-    fg = np.ones((50, 50, 3), dtype=np.uint8) * 200
-    bg = np.ones((50, 50, 3), dtype=np.uint8) * 50
-    mask = np.zeros((50, 50), dtype=np.float32)
-    mask[10:40, 10:40] = 1.0
-
-    result = blender.blend_camouflage(fg, bg, mask, distortion=5.0)
-
-    assert result is not None
-    assert result.shape == (50, 50, 3)
+    assert np.array_equal(composite, live_frame)

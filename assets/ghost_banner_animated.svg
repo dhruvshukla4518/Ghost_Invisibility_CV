@@ -1,0 +1,337 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#060911"/>
+      <stop offset="50%" stop-color="#0a1020"/>
+      <stop offset="100%" stop-color="#04060b"/>
+    </linearGradient>
+
+    <!-- Neon Cyan-Lime Gradient -->
+    <linearGradient id="neonGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="50%" stop-color="#4facfe"/>
+      <stop offset="100%" stop-color="#00ff87"/>
+    </linearGradient>
+
+    <!-- Ghost Spectral Glow -->
+    <radialGradient id="ghostGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#00ff87" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#00f2fe" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Core Ghost Body Gradient -->
+    <linearGradient id="ghostBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e0f8ff" stop-opacity="0.95"/>
+      <stop offset="60%" stop-color="#72e4ff" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#00f2fe" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <!-- Grid Pattern -->
+    <pattern id="cyberGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0, 242, 254, 0.08)" stroke-width="1"/>
+    </pattern>
+
+    <!-- Glow Filter -->
+    <filter id="glowFilter" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="intenseGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur1"/>
+      <feGaussianBlur stdDeviation="4" result="blur2"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <style>
+      @keyframes floatGhost {
+        0% { transform: translateY(0px) rotate(0deg); }
+        50% { transform: translateY(-16px) rotate(2.5deg); }
+        100% { transform: translateY(0px) rotate(0deg); }
+      }
+
+      @keyframes pulseGlow {
+        0%, 100% { opacity: 0.6; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.15); }
+      }
+
+      @keyframes scanlineAnim {
+        0% { transform: translateY(-420px); opacity: 0; }
+        15% { opacity: 0.8; }
+        85% { opacity: 0.8; }
+        100% { transform: translateY(420px); opacity: 0; }
+      }
+
+      @keyframes radarSweep {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      @keyframes badgePulse {
+        0%, 100% { opacity: 0.9; }
+        50% { opacity: 0.4; }
+      }
+
+      @keyframes dashMove {
+        0% { stroke-dashoffset: 0; }
+        100% { stroke-dashoffset: 80; }
+      }
+
+      @keyframes glitchText {
+        0%, 100% { transform: translate(0, 0); }
+        92% { transform: translate(0, 0); }
+        94% { transform: translate(-2px, 1px); }
+        96% { transform: translate(2px, -1px); }
+        98% { transform: translate(-1px, 2px); }
+      }
+
+      .ghost-container {
+        transform-origin: 190px 210px;
+        animation: floatGhost 4.5s ease-in-out infinite;
+      }
+
+      .pulse-glow {
+        transform-origin: 190px 210px;
+        animation: pulseGlow 3.5s ease-in-out infinite;
+      }
+
+      .scanline {
+        animation: scanlineAnim 5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      }
+
+      .radar {
+        transform-origin: 1080px 100px;
+        animation: radarSweep 6s linear infinite;
+      }
+
+      .live-dot {
+        animation: badgePulse 1.8s ease-in-out infinite;
+      }
+
+      .cyber-dash {
+        stroke-dasharray: 8 6;
+        animation: dashMove 3s linear infinite;
+      }
+
+      .glitch-title {
+        animation: glitchText 4s infinite;
+      }
+
+      .font-mono {
+        font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+      }
+
+      .font-sans {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      }
+    </style>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="1200" height="420" rx="16" fill="url(#bgGrad)"/>
+  
+  <!-- Cyber Grid -->
+  <rect width="1200" height="420" rx="16" fill="url(#cyberGrid)"/>
+
+  <!-- Scanning Laser Line -->
+  <g class="scanline">
+    <line x1="0" y1="210" x2="1200" y2="210" stroke="url(#neonGrad)" stroke-width="2" filter="url(#glowFilter)"/>
+    <rect x="0" y="200" width="1200" height="20" fill="url(#neonGrad)" opacity="0.06"/>
+  </g>
+
+  <!-- Ambient Light Corner Flares -->
+  <circle cx="100" cy="50" r="160" fill="#00f2fe" opacity="0.08" filter="url(#intenseGlow)"/>
+  <circle cx="1100" cy="370" r="180" fill="#00ff87" opacity="0.07" filter="url(#intenseGlow)"/>
+
+  <!-- Holographic Grid Accent Borders -->
+  <g stroke="rgba(0, 242, 254, 0.3)" stroke-width="1.5" fill="none">
+    <!-- Top-left reticle -->
+    <path d="M 24 60 L 24 24 L 60 24"/>
+    <!-- Top-right reticle -->
+    <path d="M 1140 24 L 1176 24 L 1176 60"/>
+    <!-- Bottom-left reticle -->
+    <path d="M 24 360 L 24 396 L 60 396"/>
+    <!-- Bottom-right reticle -->
+    <path d="M 1140 396 L 1176 396 L 1176 360"/>
+  </g>
+
+  <!-- Cyber Animated Dashed Border Top & Bottom -->
+  <line x1="80" y1="24" x2="1120" y2="24" stroke="rgba(0, 242, 254, 0.4)" stroke-width="1.5" class="cyber-dash"/>
+  <line x1="80" y1="396" x2="1120" y2="396" stroke="rgba(0, 255, 135, 0.4)" stroke-width="1.5" class="cyber-dash"/>
+
+  <!-- Telemetry Radar (Top Right) -->
+  <g opacity="0.75">
+    <circle cx="1080" cy="95" r="45" fill="rgba(10, 20, 35, 0.7)" stroke="rgba(0, 242, 254, 0.35)" stroke-width="1.5"/>
+    <circle cx="1080" cy="95" r="30" fill="none" stroke="rgba(0, 242, 254, 0.25)" stroke-width="1"/>
+    <circle cx="1080" cy="95" r="15" fill="none" stroke="rgba(0, 242, 254, 0.2)" stroke-width="1"/>
+    <line x1="1035" y1="95" x2="1125" y2="95" stroke="rgba(0, 242, 254, 0.3)" stroke-width="1"/>
+    <line x1="1080" y1="50" x2="1080" y2="140" stroke="rgba(0, 242, 254, 0.3)" stroke-width="1"/>
+    <!-- Radar Sweep Needle -->
+    <g class="radar">
+      <line x1="1080" y1="95" x2="1125" y2="95" stroke="#00ff87" stroke-width="2" filter="url(#glowFilter)"/>
+      <polygon points="1080,95 1125,95 1115,75" fill="rgba(0, 255, 135, 0.15)"/>
+    </g>
+    <!-- Blip -->
+    <circle cx="1098" cy="80" r="3" fill="#00ff87" class="live-dot" filter="url(#glowFilter)"/>
+    <text x="1080" y="155" fill="#72e4ff" font-size="10" text-anchor="middle" class="font-mono">CV RADAR: LOCK</text>
+  </g>
+
+  <!-- Left Side: Spectral Floating Ghost Avatar -->
+  <g class="pulse-glow">
+    <ellipse cx="190" cy="205" rx="110" ry="110" fill="url(#ghostGlow)"/>
+  </g>
+
+  <!-- Ghost Character Illustration -->
+  <g class="ghost-container">
+    <!-- Ethereal Trail Shadows -->
+    <path d="M 190 95 C 135 95 120 145 120 185 C 120 235 110 280 135 295 C 150 305 165 285 180 298 C 195 310 210 290 225 302 C 240 312 255 292 265 282 C 275 255 260 215 260 185 C 260 145 245 95 190 95 Z"
+          fill="rgba(0, 242, 254, 0.25)" filter="url(#glowFilter)" transform="translate(-8, 6) scale(1.04)"/>
+    
+    <!-- Core Ghost Silhouette -->
+    <path d="M 190 100 C 140 100 125 145 125 185 C 125 235 115 275 140 288 C 155 296 170 278 185 290 C 200 300 215 280 230 292 C 242 300 252 282 258 270 C 268 245 255 210 255 185 C 255 145 240 100 190 100 Z"
+          fill="url(#ghostBodyGrad)" filter="url(#glowFilter)"/>
+
+    <!-- Glowing Eyes (Cyberpunk Cyan/Neon) -->
+    <ellipse cx="165" cy="175" rx="9" ry="14" fill="#060d1a"/>
+    <ellipse cx="167" cy="173" rx="4" ry="7" fill="#00f2fe" filter="url(#glowFilter)"/>
+    <circle cx="168" cy="171" r="2" fill="#ffffff"/>
+
+    <ellipse cx="215" cy="175" rx="9" ry="14" fill="#060d1a"/>
+    <ellipse cx="213" cy="173" rx="4" ry="7" fill="#00f2fe" filter="url(#glowFilter)"/>
+    <circle cx="212" cy="171" r="2" fill="#ffffff"/>
+
+    <!-- Cute Ghost Smile -->
+    <path d="M 178 198 Q 190 208 202 198" fill="none" stroke="#060d1a" stroke-width="3.5" stroke-linecap="round"/>
+
+    <!-- Cheek Blush (Sci-Fi Neon Pink / Violet Glow) -->
+    <circle cx="148" cy="192" r="7" fill="#ff007f" opacity="0.5" filter="url(#glowFilter)"/>
+    <circle cx="232" cy="192" r="7" fill="#ff007f" opacity="0.5" filter="url(#glowFilter)"/>
+
+    <!-- Holographic Scan Nodes on Ghost -->
+    <circle cx="190" cy="130" r="3" fill="#00ff87" class="live-dot" filter="url(#glowFilter)"/>
+    <circle cx="140" cy="220" r="3" fill="#00f2fe" class="live-dot" filter="url(#glowFilter)"/>
+    <circle cx="240" cy="220" r="3" fill="#00ff87" class="live-dot" filter="url(#glowFilter)"/>
+    <line x1="140" y1="220" x2="240" y2="220" stroke="rgba(0, 242, 254, 0.4)" stroke-dasharray="3 3"/>
+  </g>
+
+  <!-- Right / Center: Main Title & Telemetry Information -->
+  <g transform="translate(340, 70)">
+    
+    <!-- Top System Status Badges -->
+    <g transform="translate(0, 0)">
+      <!-- System Live Pill -->
+      <rect x="0" y="0" width="135" height="26" rx="13" fill="rgba(0, 255, 135, 0.12)" stroke="rgba(0, 255, 135, 0.4)" stroke-width="1.2"/>
+      <circle cx="14" cy="13" r="5" fill="#00ff87" class="live-dot" filter="url(#glowFilter)"/>
+      <text x="26" y="17" fill="#00ff87" font-size="11" font-weight="700" class="font-mono">SYSTEM ONLINE</text>
+
+      <!-- FPS Telemetry Pill -->
+      <rect x="145" y="0" width="115" height="26" rx="13" fill="rgba(0, 242, 254, 0.12)" stroke="rgba(0, 242, 254, 0.4)" stroke-width="1.2"/>
+      <circle cx="159" cy="13" r="5" fill="#00f2fe" class="live-dot" filter="url(#glowFilter)"/>
+      <text x="171" y="17" fill="#00f2fe" font-size="11" font-weight="700" class="font-mono">60+ FPS REALTIME</text>
+
+      <!-- Neural Segmentation Pill -->
+      <rect x="270" y="0" width="165" height="26" rx="13" fill="rgba(114, 228, 255, 0.12)" stroke="rgba(114, 228, 255, 0.4)" stroke-width="1.2"/>
+      <circle cx="284" cy="13" r="5" fill="#72e4ff" class="live-dot" filter="url(#glowFilter)"/>
+      <text x="296" y="17" fill="#72e4ff" font-size="11" font-weight="700" class="font-mono">MEDIAPIPE NEURAL AI</text>
+
+      <!-- Invisibility Engine Pill -->
+      <rect x="445" y="0" width="175" height="26" rx="13" fill="rgba(255, 200, 0, 0.12)" stroke="rgba(255, 200, 0, 0.4)" stroke-width="1.2"/>
+      <circle cx="459" cy="13" r="5" fill="#ffc800" class="live-dot" filter="url(#glowFilter)"/>
+      <text x="471" y="17" fill="#ffc800" font-size="11" font-weight="700" class="font-mono">100% OPTICAL CLOAK</text>
+    </g>
+
+    <!-- Main Title: GHOST INVISIBILITY CV -->
+    <g class="glitch-title" transform="translate(0, 75)">
+      <text x="0" y="0" fill="url(#neonGrad)" font-size="52" font-weight="900" letter-spacing="2" class="font-sans" filter="url(#intenseGlow)">
+        GHOST INVISIBILITY CV
+      </text>
+      <text x="0" y="0" fill="#ffffff" font-size="52" font-weight="900" letter-spacing="2" class="font-sans">
+        GHOST INVISIBILITY CV
+      </text>
+    </g>
+
+    <!-- Subtitle -->
+    <text x="2" y="115" fill="#8baac8" font-size="17" font-weight="500" letter-spacing="0.5" class="font-sans">
+      Next-Gen Real-Time Computer Vision · Optical Cloak · Spectral Aura · Cyber Glitch
+    </text>
+
+    <!-- Feature Matrix Pills -->
+    <g transform="translate(0, 145)">
+      <!-- Feature 1: Clean Room Background -->
+      <g transform="translate(0, 0)">
+        <rect width="180" height="34" rx="8" fill="rgba(20, 32, 55, 0.85)" stroke="rgba(0, 242, 254, 0.25)" stroke-width="1"/>
+        <text x="14" y="22" fill="#00f2fe" font-size="13" font-weight="600" class="font-mono">🫥 Clean Room Inpainting</text>
+      </g>
+
+      <!-- Feature 2: Spectral Trails -->
+      <g transform="translate(192, 0)">
+        <rect width="170" height="34" rx="8" fill="rgba(20, 32, 55, 0.85)" stroke="rgba(0, 255, 135, 0.25)" stroke-width="1"/>
+        <text x="14" y="22" fill="#00ff87" font-size="13" font-weight="600" class="font-mono">👻 Spectral Ghost Trails</text>
+      </g>
+
+      <!-- Feature 3: Predator Camouflage -->
+      <g transform="translate(374, 0)">
+        <rect width="185" height="34" rx="8" fill="rgba(20, 32, 55, 0.85)" stroke="rgba(255, 180, 0, 0.25)" stroke-width="1"/>
+        <text x="14" y="22" fill="#ffb400" font-size="13" font-weight="600" class="font-mono">⚡ Active Camouflage Cloak</text>
+      </g>
+
+      <!-- Feature 4: Neon Cyber Glitch -->
+      <g transform="translate(571, 0)">
+        <rect width="185" height="34" rx="8" fill="rgba(20, 32, 55, 0.85)" stroke="rgba(255, 0, 127, 0.25)" stroke-width="1"/>
+        <text x="14" y="22" fill="#ff3399" font-size="13" font-weight="600" class="font-mono">🔮 Neon Aura &amp; Matrix Glitch</text>
+      </g>
+    </g>
+
+    <!-- Bottom Tech Stack Indicators -->
+    <g transform="translate(2, 205)">
+      <text x="0" y="24" fill="#587394" font-size="12" font-weight="700" letter-spacing="1.5" class="font-mono">TECH STACK:</text>
+      
+      <!-- Python Badge -->
+      <g transform="translate(100, 8)">
+        <rect width="82" height="24" rx="4" fill="#1e293b" stroke="#38bdf8" stroke-width="1"/>
+        <text x="41" y="16" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle" class="font-mono">Python 3.x</text>
+      </g>
+
+      <!-- OpenCV Badge -->
+      <g transform="translate(190, 8)">
+        <rect width="78" height="24" rx="4" fill="#1e293b" stroke="#ef4444" stroke-width="1"/>
+        <text x="39" y="16" fill="#ef4444" font-size="11" font-weight="700" text-anchor="middle" class="font-mono">OpenCV 4</text>
+      </g>
+
+      <!-- MediaPipe Badge -->
+      <g transform="translate(276, 8)">
+        <rect width="90" height="24" rx="4" fill="#1e293b" stroke="#f59e0b" stroke-width="1"/>
+        <text x="45" y="16" fill="#f59e0b" font-size="11" font-weight="700" text-anchor="middle" class="font-mono">MediaPipe AI</text>
+      </g>
+
+      <!-- NumPy Badge -->
+      <g transform="translate(374, 8)">
+        <rect width="72" height="24" rx="4" fill="#1e293b" stroke="#60a5fa" stroke-width="1"/>
+        <text x="36" y="16" fill="#60a5fa" font-size="11" font-weight="700" text-anchor="middle" class="font-mono">NumPy</text>
+      </g>
+
+      <!-- Streamlit Badge -->
+      <g transform="translate(454, 8)">
+        <rect width="84" height="24" rx="4" fill="#1e293b" stroke="#ff4b4b" stroke-width="1"/>
+        <text x="42" y="16" fill="#ff4b4b" font-size="11" font-weight="700" text-anchor="middle" class="font-mono">Streamlit UI</text>
+      </g>
+
+      <!-- CI / Tested Badge -->
+      <g transform="translate(546, 8)">
+        <rect width="88" height="24" rx="4" fill="#1e293b" stroke="#22c55e" stroke-width="1"/>
+        <text x="44" y="16" fill="#22c55e" font-size="11" font-weight="700" text-anchor="middle" class="font-mono">✓ 100% Tested</text>
+      </g>
+    </g>
+
+  </g>
+</svg>

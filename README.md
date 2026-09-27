@@ -1,1057 +1,145 @@
-👻 Real-Time Ghost Invisibility System
+# Ghost Invisibility CV - AI Vision System
 
-<p align="center">A real-time Computer Vision project for creating Ghost, Invisibility, Neon, and Glitch visual effects using a live camera stream.
-
-Built with Python · OpenCV · MediaPipe · NumPy
-
-</p><p align="center">"Python" (https://img.shields.io/badge/Python-3.x-blue?logo=python)
-"OpenCV" (https://img.shields.io/badge/OpenCV-Computer%20Vision-red?logo=opencv)
-"MediaPipe" (https://img.shields.io/badge/MediaPipe-Computer%20Vision-orange)
-"NumPy" (https://img.shields.io/badge/NumPy-Numerical%20Computing-013243?logo=numpy)
-"PyTest" (https://img.shields.io/badge/PyTest-Testing-green?logo=pytest)
-"License" (https://img.shields.io/badge/Project-Educational-lightgrey)
-
-</p>---
-
-📌 Overview
-
-Ghost Invisibility CV is a real-time computer vision application that creates ghost-like and invisibility effects from a live camera feed.
-
-The system combines:
-
-- AI-based person segmentation using MediaPipe
-- OpenCV-based background processing
-- Binary and soft mask generation
-- Morphological image processing
-- Contour filtering
-- Alpha blending
-- Edge detection
-- Temporal ghost trails
-- Hand gesture recognition
-- Real-time FPS monitoring
-- Screenshot and video output
-
-The main idea is to identify the person in the camera frame, generate a refined person mask, and use that mask to control how the person is rendered in the final frame.
-
-«Note: This project creates a computer-vision visual illusion. It does not physically make a person invisible.»
+A modular, real-time Computer Vision application written in Python featuring **Invisibility Cloak Effects**, **Spectral Ghost Visuals**, **Dual-Mode Segmentation (HSV & MediaPipe AI)**, **MediaPipe Hand Gesture Control**, **Futuristic Sci-Fi HUD**, **MP4 Video & Screenshot Recording**, and automated tests.
 
 ---
 
-✨ Features
+## 🌟 Features
 
-🎥 Real-Time Camera Processing
-
-Processes webcam frames continuously using OpenCV.
-
-Default configuration:
-
-Camera Index : 0
-Resolution   : 640 × 480
-Target FPS   : 30
-
----
-
-🧠 AI Person Segmentation
-
-Uses MediaPipe-based person segmentation to estimate the pixels belonging to a person.
-
-The segmentation mask is combined with background-difference information to improve the final mask.
+- 🧙‍♂️ **Invisibility Cloak Engine**: Seamlessly replaces red/colored cloaks (or AI-segmented human figures) with a temporal median background.
+- 👻 **Spectral Ghost Mode**: Renders transparent phantom effects with **motion trails**, **glowing spectral auras**, and **OpenCV colormaps** (Bone, Ocean, Jet, Plasma, Cyberpunk).
+- 🤖 **Dual-Engine Segmentation**:
+  - **HSV Color Segmentation**: Thresholds colors (Red, Green, Blue, Cyan, Magenta, Yellow) with dual-range boundary handling for red hues.
+  - **MediaPipe AI Person Segmentation**: Neural-network selfie segmenter for cloaking without requiring physical colored cloth.
+- 🖐️ **Hand Gesture Controls**:
+  - **Pinch (Thumb + Index)**: Dynamically adjusts ghost opacity / transparency in real time.
+  - **Open Palm**: Switches mode to Invisibility Cloak.
+  - **Fist**: Triggers background frame recapture.
+  - **Peace Sign (V)**: Cycles spectral colormaps.
+- 🖥️ **Sci-Fi Heads-Up Display (HUD)**: Interactive neon UI (hidden by default for a clean video feed; toggle with `h` or launch with `--hud`).
+- 📸 **Recording & Screenshots**: Capture timestamped PNG screenshots (`outputs/screenshots/`) or record MP4 video streams (`outputs/videos/`).
+- 🎮 **Synthetic Camera Generator**: Built-in animated fallback camera to test and evaluate the entire vision pipeline without requiring a physical webcam!
 
 ---
 
-🎭 Multiple Visual Modes
+## 📁 Directory Structure
 
-The project supports several rendering modes:
-
-Mode| Description
-"NORMAL"| Original camera feed
-"GHOST"| Semi-transparent ghost effect
-"INVISIBLE"| Background replacement inside the person region
-"NEON_GHOST"| Ghost effect with detected edge aura
-"GLITCH"| Digital displacement/glitch effect
-
----
-
-🫥 Invisibility Effect
-
-The clean background is used to replace the detected person region.
-
-Conceptually:
-
-Camera Frame
-     +
-Person Mask
-     +
-Clean Background
-     ↓
-Invisibility Effect
-
-The quality of the effect depends heavily on the quality of the captured background and segmentation mask.
-
----
-
-👻 Ghost Effect
-
-Ghost mode uses alpha blending to create a semi-transparent appearance.
-
-The basic blending concept is:
-
-Output = α × Foreground + (1 - α) × Background
-
-The project also supports historical frames for a fading ghost-trail effect.
-
----
-
-🟢 Neon Ghost
-
-The person mask can be processed using edge detection to create a neon-style outline.
-
-Conceptually:
-
-Person Mask
-     ↓
-Canny Edge Detection
-     ↓
-Edge Dilation
-     ↓
-Colored Edge Layer
-     ↓
-Ghost Rendering
-
----
-
-⚡ Glitch Effect
-
-Glitch mode introduces digital-style displacement by shifting selected image regions horizontally.
-
-This produces a distorted visual effect while retaining the ghost-processing pipeline.
-
----
-
-✋ Hand Gesture Control
-
-The project contains optional MediaPipe hand tracking.
-
-Supported gestures include:
-
-Gesture| Intended Action
-🖐️ Open Palm| Ghost Mode
-✊ Fist| Normal Mode
-✌️ Victory| Invisible Mode
-👍 Thumb Up| Increase intensity
-👎 Thumb Down| Decrease intensity
-
-Hand tracking is disabled by default to help maintain real-time performance.
-
----
-
-📊 Real-Time HUD
-
-The application provides a Heads-Up Display containing information such as:
-
-- FPS
-- Current mode
-- Segmentation status
-- Gesture status
-- Background status
-- Effect intensity
-- Recording status
-
----
-
-📸 Screenshot & Video Output
-
-The application includes utilities for:
-
-- Saving screenshots
-- Recording processed video
-- Managing output directories
-
----
-
-🧠 System Architecture
-
-The complete application follows a modular architecture:
-
-                         ┌──────────────────┐
-                         │      Webcam      │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ CameraManager    │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │ Current Frame    │
-                         └────────┬─────────┘
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │                           │
-                    ▼                           ▼
-            ┌──────────────┐          ┌─────────────────┐
-            │ Hand Tracker │          │ Background      │
-            └──────────────┘          │ Manager         │
-                                      └────────┬────────┘
-                                               │
-                                               ▼
-                                      ┌─────────────────┐
-                                      │ Person          │
-                                      │ Segmentation    │
-                                      └────────┬────────┘
-                                               │
-                                               ▼
-                                      ┌─────────────────┐
-                                      │ Raw Person Mask │
-                                      └────────┬────────┘
-                                               │
-                                               ▼
-                                      ┌─────────────────┐
-                                      │ Mask Processor  │
-                                      └────────┬────────┘
-                                               │
-                                               ▼
-                                      ┌─────────────────┐
-                                      │ Refined Mask    │
-                                      └────────┬────────┘
-                                               │
-                                               ▼
-                                      ┌─────────────────┐
-                                      │ Ghost Effect    │
-                                      │ Engine          │
-                                      └────────┬────────┘
-                                               │
-                              ┌────────────────┼────────────────┐
-                              ▼                ▼                ▼
-                           NORMAL            GHOST          INVISIBLE
-                              │                │                │
-                              └────────────────┼────────────────┘
-                                               │
-                                               ▼
-                                      ┌─────────────────┐
-                                      │ Final Frame     │
-                                      │ + HUD           │
-                                      └────────┬────────┘
-                                               │
-                                  ┌────────────┴────────────┐
-                                  ▼                         ▼
-                              Display                   Recording
-
----
-
-🔬 Computer Vision Pipeline
-
-For every camera frame, the system approximately performs:
-
-1. Capture Frame
-       ↓
-2. Calculate FPS
-       ↓
-3. Optional Hand Tracking
-       ↓
-4. Get Clean Background
-       ↓
-5. Person Segmentation
-       ↓
-6. Generate Raw Mask
-       ↓
-7. Refine Mask
-       ↓
-8. Render Selected Effect
-       ↓
-9. Draw HUD
-       ↓
-10. Record / Display
-
-The central processing loop is implemented in "main.py".
-
----
-
-🧩 Hybrid Person Mask
-
-One of the important ideas in this project is combining AI segmentation with traditional computer vision.
-
-The conceptual pipeline is:
-
-              Current Frame
-                   │
-          ┌────────┴────────┐
-          ▼                 ▼
-   MediaPipe Model    Background Difference
-          │                 │
-          ▼                 ▼
-      AI Mask          Difference Mask
-          │                 │
-          └────────┬────────┘
-                   ▼
-             Mask Fusion
-                   │
-                   ▼
-             Refined Mask
-
-The segmentation implementation uses a pixel-wise maximum operation:
-
-combined = np.maximum(ai_mask, bg_diff_mask)
-
-This allows the stronger response at each pixel to contribute to the combined mask.
-
----
-
-🎯 Mask Processing
-
-Raw segmentation masks can contain:
-
-- Small noise
-- Holes
-- Rough boundaries
-- Isolated regions
-- Unstable edges
-
-The project therefore performs several refinement operations.
-
-Raw Mask
-   ↓
-Thresholding
-   ↓
-Morphological Closing
-   ↓
-Morphological Opening
-   ↓
-Contour Filtering
-   ↓
-Dilation
-   ↓
-Gaussian Blur
-   ↓
-Final Mask
-
-Thresholding
-
-The project uses a segmentation threshold of:
-
-0.4
-
-Conceptually:
-
-Mask value > 0.4  → Foreground
-Mask value ≤ 0.4  → Background
-
----
-
-Morphological Closing
-
-Closing helps fill small holes and connect nearby foreground regions.
-
-Closing = Dilation → Erosion
-
----
-
-Morphological Opening
-
-Opening helps remove small isolated noise.
-
-Opening = Erosion → Dilation
-
----
-
-Contour Filtering
-
-OpenCV contour detection is used to identify connected regions.
-
-Very small regions can be removed using contour-area filtering.
-
-This helps prevent small segmentation artifacts from affecting the final visual effect.
-
----
-
-Dilation
-
-Dilation expands the detected foreground region.
-
-This helps reduce small gaps around the detected person boundary.
-
----
-
-Gaussian Blur
-
-The mask is blurred to create smoother boundaries.
-
-This is useful for alpha blending because hard binary edges can look unnatural.
-
----
-
-🎨 Ghost Rendering
-
-The "GhostEffectEngine" controls the visual rendering modes.
-
-The rendering stage receives:
-
-Current Frame
-Clean Background
-Refined Person Mask
-
-and produces:
-
-Final Effect Frame
-
----
-
-👻 GHOST
-
-Ghost mode creates a semi-transparent appearance.
-
-The configured default ghost intensity is:
-
-0.7
-
-The system can also maintain previous frames to create a fading temporal trail.
-
----
-
-🫥 INVISIBLE
-
-Invisible mode uses the clean background in the detected person region.
-
-Conceptually:
-
-Current Frame
-      ↓
-Person Mask
-      ↓
-Replace Person Region
-      ↓
-Clean Background
-      ↓
-Final Frame
-
-For best results:
-
-«Capture the background while the person is outside the camera view.»
-
----
-
-🟢 NEON_GHOST
-
-Neon Ghost uses edge detection to emphasize the person's boundary.
-
-Main techniques:
-
-- Canny edge detection
-- Edge dilation
-- Colored edge layer
-- Weighted blending
-
----
-
-⚡ GLITCH
-
-Glitch mode creates digital distortion by horizontally shifting selected regions of the image.
-
-This uses NumPy/OpenCV image operations rather than a machine-learning model.
-
----
-
-🕒 Ghost Trail
-
-The project uses Python's "deque" data structure to maintain historical frames.
-
-Default:
-
-GHOST_TRAIL_LENGTH = 5
-
-Conceptually:
-
-Current Frame
-     │
-     ├── Previous Frame
-     ├── Previous Frame
-     ├── Previous Frame
-     ├── Previous Frame
-     └── Previous Frame
-              ↓
-       Fading Ghost Trail
-
-Older frames contribute with lower intensity, creating a temporal motion effect.
-
----
-
-✋ Hand Tracking
-
-Hand tracking is implemented as an optional module.
-
-The system uses MediaPipe hand landmarks to recognize gestures.
-
-The feature is disabled by default:
-
-ENABLE_HAND_TRACKING = False
-
-This is intentional because hand tracking adds additional computation to the real-time pipeline.
-
-It can be toggled during execution.
-
----
-
-📁 Project Structure
-
-Ghost_Invisibility_CV/
+```
+ghost_invisibility_cv/
 │
-├── main.py
-│   └── Main application entry point and pipeline orchestrator
-│
-├── config.py
-│   └── Centralized configuration
-│
-├── app.py
-│   └── Application/demo interface
-│
-├── requirements.txt
-│   └── Python dependencies
-│
-├── packages.txt
-│   └── Additional package configuration
-│
-├── pytest.ini
-│   └── PyTest configuration
-│
-├── test_pipeline.py
-│   └── Pipeline-level testing
+├── main.py                     # Main application entry point & event loop
+├── config.py                   # Centralized configuration, HSV presets & keybindings
+├── requirements.txt            # Dependencies list
+├── README.md                   # Project documentation
 │
 ├── src/
 │   ├── __init__.py
-│   ├── camera.py
-│   │   └── Camera and synthetic frame management
-│   │
-│   ├── segmentation.py
-│   │   └── Person segmentation
-│   │
-│   ├── background.py
-│   │   └── Background capture and management
-│   │
-│   ├── mask_processing.py
-│   │   └── Mask refinement
-│   │
-│   ├── blending.py
-│   │   └── Alpha blending
-│   │
-│   ├── hand_tracking.py
-│   │   └── Hand tracking and gesture recognition
-│   │
-│   ├── ghost_effect.py
-│   │   └── Ghost and visual effects
-│   │
-│   └── hud.py
-│       └── HUD and telemetry overlay
+│   ├── camera.py               # OpenCV VideoCapture wrapper & Synthetic Camera fallback
+│   ├── background.py           # Multi-frame temporal median background manager
+│   ├── segmentation.py         # Dual HSV Color & MediaPipe AI Segmentation
+│   ├── mask_processing.py      # Morphological cleanup, contour filtering & edge softening
+│   ├── ghost_effect.py         # Motion trails, glowing spectral aura & colormap engine
+│   ├── blending.py             # Multi-layer smooth alpha compositor
+│   ├── hand_tracking.py        # MediaPipe hand tracking & gesture recognition
+│   └── hud.py                  # Sci-Fi HUD overlay renderer
 │
 ├── utils/
 │   ├── __init__.py
-│   ├── fps.py
-│   │   └── FPS calculation
-│   │
-│   └── image_utils.py
-│       └── Screenshot and video utilities
-│
-├── tests/
-│   └── Automated tests
+│   ├── fps.py                  # Smoothed FPS counter
+│   └── image_utils.py          # Screenshot saver & VideoRecorder helper
 │
 ├── assets/
-│   ├── backgrounds/
-│   └── screenshots/
+│   ├── backgrounds/            # Custom static background images
+│   └── screenshots/            # Asset samples
 │
-└── outputs/
-    ├── screenshots/
-    └── videos/
+├── outputs/
+│   ├── screenshots/            # Saved PNG screenshots
+│   └── videos/                 # Recorded MP4 output videos
+│
+└── tests/
+    ├── test_segmentation.py    # HSV & AI segmentation unit tests
+    ├── test_mask.py            # Morphological mask processing unit tests
+    └── test_blending.py        # Image composition unit tests
+```
 
 ---
 
-🛠️ Technologies
+## ⚡ Quick Start
 
-Technology| Role
-Python| Main programming language
-OpenCV| Image and video processing
-MediaPipe| Person segmentation and hand tracking
-NumPy| Pixel-level numerical operations
-PyTest| Automated testing
-Argparse| Command-line argument handling
+### 1. Installation
 
----
+Install required Python packages:
 
-⚙️ Configuration
-
-Central configuration is maintained in:
-
-config.py
-
-Important parameters include:
-
-CAMERA_INDEX = 0
-
-FRAME_WIDTH = 640
-FRAME_HEIGHT = 480
-FPS = 30
-
-SEGMENTATION_THRESHOLD = 0.4
-
-MORPH_KERNEL_SIZE = (5, 5)
-ERODE_ITERATIONS = 1
-DILATE_ITERATIONS = 2
-GAUSSIAN_BLUR_KERNEL = (15, 15)
-
-DEFAULT_ALPHA = 0.0
-DEFAULT_GHOST_INTENSITY = 0.7
-GHOST_TRAIL_LENGTH = 5
-
-ENABLE_HAND_TRACKING = False
-
-These parameters allow the behaviour and performance of the application to be adjusted without modifying the main pipeline.
-
----
-
-🚀 Installation
-
-1. Clone the Repository
-
-git clone https://github.com/dhruvshukla4518/Ghost_Invisibility_CV.git
-
-cd Ghost_Invisibility_CV
-
----
-
-2. Create a Virtual Environment
-
-Windows
-
-python -m venv venv
-
-Activate:
-
-venv\Scripts\activate
-
-Linux / macOS
-
-python3 -m venv venv
-
-Activate:
-
-source venv/bin/activate
-
----
-
-3. Install Dependencies
-
+```bash
 pip install -r requirements.txt
+```
 
----
+### 2. Running the Application
 
-▶️ Running the Application
+Launch with standard live webcam:
 
-Start the normal application:
-
+```bash
 python main.py
+```
 
----
+Launch in **Synthetic Test Mode** (No webcam required):
 
-📷 Select a Camera
-
-The application supports camera selection through the command line.
-
-For the default camera:
-
-python main.py --camera 0
-
-For another connected camera:
-
-python main.py --camera 1
-
----
-
-🧪 Synthetic Mode
-
-The project supports a synthetic camera mode for testing/demo purposes without a physical webcam:
-
+```bash
 python main.py --synthetic
+```
+
+Launch with specific initial mode or cloak color:
+
+```bash
+python main.py --mode GHOST --color BLUE
+```
+
+Disable hand tracking:
+
+```bash
+python main.py --no-hand-tracking
+```
+
+Use custom static background image:
+
+```bash
+python main.py --background assets/backgrounds/my_room.jpg
+```
+
+Launch with Sci-Fi HUD enabled on startup:
+
+```bash
+python main.py --hud
+```
 
 ---
 
-⏱️ Headless / Automated Mode
+## ⌨️ Controls & Shortcuts
 
-The application supports a duration argument for automated execution:
-
-python main.py --duration 10
-
-This runs the application for the specified duration and exits cleanly.
-
----
-
-🎮 Keyboard Controls
-
-The current main application handles these controls:
-
-Key| Action
-"B"| Capture / recapture clean background
-"G"| Switch to Ghost Mode
-"I"| Toggle Invisible Mode
-"N"| Switch to Normal Mode
-"S"| Save timestamped screenshot
-"T"| Toggle hand gesture control
-"Q"| Quit
-"ESC"| Quit
-
-Background Capture
-
-Before pressing "B":
-
-Step outside the camera view
-        ↓
-Press B
-        ↓
-Clean background captured
-
-This provides the reference background used by the invisibility system.
+| Key / Gesture | Action |
+|---|---|
+| **`b` / Fist Gesture** | Capture / Recapture Background Frame |
+| **`c` / Open Palm** | Cycle Operational Mode (`CLOAK` ➔ `GHOST` ➔ `SWAP` ➔ `NORMAL`) |
+| **`k`** | Cycle HSV Cloak Color (`RED` ➔ `GREEN` ➔ `BLUE` ➔ `CYAN` ➔ `MAGENTA` ➔ `YELLOW`) |
+| **`g` / Peace Sign** | Cycle Spectral Ghost Colormaps (`BONE` ➔ `OCEAN` ➔ `JET` ➔ `PLASMA` ➔ `CYBERPUNK`) |
+| **`h`** | Toggle Sci-Fi HUD Overlay (Default: OFF) |
+| **`s`** | Take Timestamped PNG Screenshot |
+| **`r`** | Start / Stop MP4 Video Recording |
+| **`+` / `-` / Pinch** | Adjust Transparency / Opacity Level |
+| **`q` / ESC** | Exit Application |
 
 ---
 
-🧪 Testing
+## 🧪 Running Unit Tests
 
-Run the project's automated tests with:
+Run automated tests via `pytest`:
 
-pytest tests/ -v
-
-The repository includes testing support for the computer-vision pipeline.
-
----
-
-🔄 Application Workflow
-
-START
-  │
-  ▼
-Parse Command-Line Arguments
-  │
-  ▼
-Initialize Camera
-  │
-  ▼
-Initialize CV Modules
-  │
-  ├── Person Segmenter
-  ├── Background Manager
-  ├── Mask Processor
-  ├── Blender
-  ├── Ghost Engine
-  ├── Hand Tracker
-  ├── HUD
-  ├── FPS Counter
-  └── Video Recorder
-  │
-  ▼
-Capture Initial Background
-  │
-  ▼
-┌─────────────────────────────┐
-│       MAIN FRAME LOOP       │
-│                             │
-│ Capture Frame               │
-│       ↓                     │
-│ Update FPS                  │
-│       ↓                     │
-│ Hand Tracking               │
-│       ↓                     │
-│ Person Segmentation         │
-│       ↓                     │
-│ Mask Refinement             │
-│       ↓                     │
-│ Effect Rendering            │
-│       ↓                     │
-│ HUD Overlay                 │
-│       ↓                     │
-│ Recording                   │
-│       ↓                     │
-│ Display                     │
-│       ↓                     │
-│ Keyboard Input              │
-└──────────────┬──────────────┘
-               │
-               ▼
-             EXIT
-               │
-               ▼
-      Release Resources
+```bash
+pytest tests/
+```
 
 ---
 
-🧮 Core Algorithms
+## 📜 License
 
-This project demonstrates the practical use of several computer-vision techniques.
-
-1. Person Segmentation
-
-Used to identify the person region in each frame.
-
-2. Background Subtraction
-
-Used to identify differences between the current frame and the clean background.
-
-3. Mask Fusion
-
-Combines segmentation information and background-difference information.
-
-4. Thresholding
-
-Converts probability information into a usable foreground mask.
-
-5. Morphological Processing
-
-Used to clean and stabilize the mask.
-
-6. Contour Filtering
-
-Removes small unwanted connected regions.
-
-7. Dilation
-
-Expands the foreground mask.
-
-8. Gaussian Blur
-
-Softens mask boundaries.
-
-9. Alpha Blending
-
-Combines foreground and background according to a mask/intensity.
-
-10. Canny Edge Detection
-
-Used for neon-style outlines.
-
-11. Temporal Frame Processing
-
-Previous frames are used to generate ghost trails.
-
-12. Gesture Recognition
-
-Hand landmarks are used to interpret user gestures.
-
----
-
-🧠 AI vs Traditional Computer Vision
-
-An important design aspect of this project is the combination of AI and classical computer vision.
-
-AI Component
-
-MediaPipe
-   ↓
-Person Segmentation
-
-Traditional CV Components
-
-Background Difference
-       ↓
-Thresholding
-       ↓
-Morphological Operations
-       ↓
-Contours
-       ↓
-Dilation
-       ↓
-Gaussian Blur
-       ↓
-Canny Edge Detection
-       ↓
-Alpha Blending
-
-Therefore, this project is best described as a:
-
-«Hybrid AI + Computer Vision real-time visual-effects system.»
-
----
-
-💡 Why Use a Hybrid Approach?
-
-A segmentation model may produce imperfect boundaries because of:
-
-- Lighting changes
-- Complex backgrounds
-- Similar foreground/background colors
-- Fast movement
-- Occlusion
-- Thin structures such as fingers or hair
-- Camera noise
-
-Traditional image processing can refine the model's output before it is used for rendering.
-
-This combination makes the pipeline more practical for real-time experimentation.
-
----
-
-📈 Performance
-
-The default configuration is designed around:
-
-Resolution : 640 × 480
-Target FPS : 30
-
-Hand tracking is disabled by default to reduce additional computational overhead.
-
-Actual FPS depends on:
-
-- CPU/GPU
-- Camera
-- Resolution
-- Lighting
-- Segmentation processing
-- Hand tracking
-- Other enabled effects
-
----
-
-⚠️ Limitations
-
-The current system has several limitations:
-
-1. A clean background is important for high-quality invisibility.
-2. Complex backgrounds can affect background-difference processing.
-3. Segmentation quality depends on the pretrained model.
-4. Poor lighting can reduce mask quality.
-5. Fast movement can introduce visual artifacts.
-6. Thin objects and fine boundaries may not always be segmented perfectly.
-7. Hand tracking adds computational overhead.
-8. The system creates a visual illusion rather than physical invisibility.
-9. Real-time performance depends on the hardware and environment.
-
----
-
-🚀 Future Improvements
-
-Possible improvements include:
-
-- GPU acceleration
-- More advanced person segmentation
-- Better image matting
-- Multi-person segmentation
-- Temporal mask stabilization
-- Optical-flow-based ghost trails
-- Automatic background capture
-- Better boundary refinement
-- More advanced gesture recognition
-- Mobile-camera streaming
-- Web-based interface
-- Real-time performance optimization
-- Additional visual effects
-- Automatic parameter optimization
-
----
-
-🎓 Learning Outcomes
-
-This project provides practical experience in:
-
-- Python
-- OpenCV
-- MediaPipe
-- NumPy
-- Computer Vision
-- Image Segmentation
-- Background Subtraction
-- Mask Processing
-- Morphological Operations
-- Contour Detection
-- Edge Detection
-- Alpha Blending
-- Real-Time Video Processing
-- Hand Tracking
-- Gesture Recognition
-- Modular Software Architecture
-- Automated Testing
-- Command-Line Interfaces
-
----
-
-🔍 Project Highlights
-
-What makes this project interesting?
-
-AI Person Segmentation
-        +
-Background Processing
-        +
-Mask Refinement
-        +
-Computer Vision Effects
-        +
-Real-Time Rendering
-        +
-Optional Gesture Control
-        =
-Interactive Ghost/Invisibility System
-
-The project demonstrates how a pretrained AI model can be combined with classical computer-vision algorithms to build an interactive real-time application.
-
----
-
-👨‍💻 Author
-
-Dhruv Shukla
-
-Data Science | Computer Vision | AI/ML
-
-GitHub:
-https://github.com/dhruvshukla4518
-
-Project Repository:
-https://github.com/dhruvshukla4518/Ghost_Invisibility_CV
-
----
-
-⭐ Support
-
-If you find this project useful or interesting, consider giving the repository a ⭐.
-
----
-
-📜 License
-
-This project is created for educational, experimental, and computer-vision learning purposes.
-
----
-
-👻 Final Concept
-
-             CAMERA
-                │
-                ▼
-       PERSON SEGMENTATION
-                │
-                ▼
-          PERSON MASK
-                │
-                ▼
-        MASK REFINEMENT
-                │
-                ▼
-       BACKGROUND + MASK
-                │
-                ▼
-        EFFECT RENDERING
-                │
-        ┌───────┼────────┐
-        ▼       ▼        ▼
-      GHOST  INVISIBLE  NEON
-                │
-                ▼
-          FINAL OUTPUT
-
-«AI detects the person.
-Computer vision refines the mask.
-Image processing creates the effect.
-Real-time rendering produces the illusion.»
-
----
-
-<p align="center">👻 Built with Python, OpenCV, MediaPipe & NumPy
-
-Made by Dhruv Shukla
-
-</p>
+MIT License. Developed with OpenCV & MediaPipe.
