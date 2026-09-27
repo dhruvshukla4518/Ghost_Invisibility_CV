@@ -1,5 +1,6 @@
 """
 Heads-up display (HUD) overlay renderer with real room background telemetry and countdown.
+Operated exclusively via keyboard controls.
 """
 
 import cv2
@@ -8,7 +9,7 @@ import numpy as np
 
 class HUD:
     """
-    Renders real-time telemetry, mode status, FPS, gesture status,
+    Renders real-time telemetry, mode status, FPS,
     countdown timer, and keyboard control legends onto output video frames.
     """
 
@@ -24,7 +25,6 @@ class HUD:
         mode: str,
         fps: float,
         segmentation_on: bool,
-        gesture_status: str,
         has_background: bool,
         is_human_detected: bool,
         is_preset: bool = False,

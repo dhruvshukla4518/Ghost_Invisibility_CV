@@ -1,6 +1,7 @@
 """
 Real-Time Ghost Invisibility System - Main Application Entry Point.
 Featuring Clean Room Background Capture & Real-Time Invisibility.
+Controlled exclusively via keyboard shortcuts.
 """
 
 import sys
@@ -17,7 +18,6 @@ from src.background import BackgroundManager
 from src.mask_processing import MaskProcessor
 from src.blending import Blender
 from src.ghost_effect import GhostEffectEngine
-from src.hand_tracking import HandTracker
 from src.hud import HUD
 from utils.fps import FPSCounter
 from utils.image_utils import save_screenshot, VideoRecorder
@@ -52,7 +52,6 @@ def main():
     mask_processor = MaskProcessor()
     blender = Blender(default_alpha=config.DEFAULT_ALPHA)
     ghost_engine = GhostEffectEngine(blender=blender)
-    hand_tracker = HandTracker(enabled=config.ENABLE_HAND_TRACKING)
     hud = HUD()
     fps_counter = FPSCounter()
     recorder = VideoRecorder()
@@ -67,13 +66,13 @@ def main():
             print(f"[WARNING] GUI window display unavailable: {e}. Switching to headless mode.")
             headless = True
 
-    print("\n[CONTROLS GUIDE]")
+    print("\n[KEYBOARD CONTROLS GUIDE]")
     print("  'I' or 'i' : Toggle INVISIBLE Mode (Make Human Body 100% Invisible!)")
-    print("  'B' or 'b' : 3-Second Room Capture (Gives you 3s to step aside and capture your room!)")
+    print("  'B' or 'b' : 3-Second Room Capture (Gives 3s to step aside and capture your room!)")
     print("  'P' or 'p' : Cycle Background Presets (Room / Studio / Cyberpunk)")
-    print("  'C' or 'c' : Toggle Active Camouflage (Refract live background)")
-    print("  'N' or 'n' : Return to NORMAL camera feed")
+    print("  'C' or 'c' : Toggle Active Camouflage Cloak (Refract live background)")
     print("  'G' or 'g' : Toggle Spectral GHOST Mode")
+    print("  'N' or 'n' : Return to NORMAL camera feed")
     print("  'S' or 's' : Take Timestamped Screenshot")
     print("  'Q' or ESC : Exit Application\n")
 
@@ -104,20 +103,17 @@ def main():
             # B. Update FPS
             current_fps = fps_counter.update()
 
-            # C. Hand Gesture Tracking
-            gesture = hand_tracker.process_frame(frame)
-
-            # D. Pure AI Person Segmentation
+            # C. Pure AI Person Segmentation
             raw_mask = segmenter.segment(frame)
 
-            # E. Mask Refinement & Contour Cleaning
+            # D. Mask Refinement & Contour Cleaning
             refined_mask = mask_processor.process(raw_mask)
 
-            # F. Check Human Presence
+            # E. Check Human Presence
             human_coverage = np.mean(refined_mask > 0.3)
             is_human_detected = human_coverage > 0.02
 
-            # G. Handle 3-Second Room Capture Countdown
+            # F. Handle 3-Second Room Capture Countdown
             remaining_countdown = 0
             if countdown_active:
                 elapsed_cd = time.time() - countdown_start
@@ -131,23 +127,22 @@ def main():
                 # Auto-capture when no human has entered yet
                 bg_manager.auto_capture_if_clear(frame, refined_mask)
 
-            # H. Retrieve Clean Background Frame
+            # G. Retrieve Clean Background Frame
             clean_bg = bg_manager.get_background(
                 target_shape=(frame.shape[1], frame.shape[0]),
                 live_frame=frame,
                 person_mask=refined_mask,
             )
 
-            # I. Render Invisibility / Vision Effect
+            # H. Render Invisibility / Vision Effect
             rendered_frame = ghost_engine.render(frame, clean_bg, refined_mask)
 
-            # J. HUD Overlay
+            # I. HUD Overlay
             output_frame = hud.draw(
                 frame=rendered_frame,
                 mode=ghost_engine.mode,
                 fps=current_fps,
                 segmentation_on=segmenter.use_mediapipe or True,
-                gesture_status=gesture,
                 has_background=bg_manager.has_background(),
                 is_human_detected=is_human_detected,
                 is_preset=bg_manager.is_preset_active,
@@ -159,7 +154,7 @@ def main():
             # Write frame if video recording is active
             recorder.write(output_frame)
 
-            # K. Display Window
+            # J. Display Window & Keyboard Handling
             if not headless:
                 try:
                     cv2.imshow(window_name, output_frame)
@@ -200,9 +195,6 @@ def main():
                         ghost_engine.set_mode(config.MODE_NORMAL)
                     elif char_key == 's':
                         save_screenshot(output_frame)
-                    elif char_key == 't':
-                        hand_tracker.enabled = not hand_tracker.enabled
-                        print(f"[INFO] Hand gesture control set to: {hand_tracker.enabled}")
 
     except KeyboardInterrupt:
         print("\n[INFO] Keyboard interrupt detected.")
